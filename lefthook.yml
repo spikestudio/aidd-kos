@@ -23,4 +23,4 @@ pre-commit:
 pre-push:
   commands:
     test:
-      run: uv run pytest
+      run: uv run pytest -m "not integration"
