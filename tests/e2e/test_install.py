@@ -41,12 +41,40 @@ def env_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
 
+@pytest.fixture()
+def mock_subprocesses(monkeypatch: pytest.MonkeyPatch):
+    """mise install / uv sync / codegraph init の subprocess 呼び出しをモック化する。
+    integration テストが実際の外部ツール（mise/npx/LightRAG）なしに実行できるようにする。"""
+    from unittest.mock import MagicMock, patch
+
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = '{"initialized": true}'
+
+    # LightRAG ヘルスチェックは即座に OK を返す
+
+    def fake_urlopen(req, timeout=None):
+        resp = MagicMock()
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = MagicMock(return_value=False)
+        resp.read.return_value = b'{"status": "ok"}'
+        return resp
+
+    with (
+        patch("aidd_kos.install.subprocess.run", return_value=mock_result),
+        patch("aidd_kos.install.subprocess.Popen"),
+        patch("aidd_kos.install.urllib.request.urlopen", fake_urlopen),
+        patch("aidd_kos.index.urllib.request.urlopen", fake_urlopen),
+    ):
+        yield
+
+
 # ── AC-F01-01: 全自動実行 ─────────────────────────────────────────────────────
 
 
 @pytest.mark.integration
 def test_ac_f01_01_e2e_install_full_auto(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-01: E2E - install コマンドが全ステップを自動実行する"""
     result = runner.invoke(app, ["install", "--project-dir", str(project_dir)])
@@ -60,7 +88,7 @@ def test_ac_f01_01_e2e_install_full_auto(
 
 @pytest.mark.integration
 def test_ac_f01_02_e2e_completion_message(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-02: E2E - 完了後に「Claude Code を再起動してください」が表示される"""
     result = runner.invoke(app, ["install", "--project-dir", str(project_dir)])
@@ -72,7 +100,7 @@ def test_ac_f01_02_e2e_completion_message(
 
 @pytest.mark.integration
 def test_ac_f01_03_e2e_mcp_entry_added(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-03: E2E - ~/.claude/settings.json に aidd-kos エントリが追加される"""
     runner.invoke(app, ["install", "--project-dir", str(project_dir)])
@@ -87,7 +115,7 @@ def test_ac_f01_03_e2e_mcp_entry_added(
 
 @pytest.mark.integration
 def test_ac_f01_04_e2e_storage_created(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-04: E2E - .lightrag/ と .codegraph/ が対象プロジェクト内に作成される"""
     runner.invoke(app, ["install", "--project-dir", str(project_dir)])
@@ -124,7 +152,7 @@ def test_ac_f01_06_e2e_openai_key_missing_error(project_dir: Path, env_without_k
 
 @pytest.mark.integration
 def test_ac_f01_07_e2e_gitignore_lightrag(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-07: E2E - install 後に .gitignore に .lightrag/ が追記される"""
     runner.invoke(app, ["install", "--project-dir", str(project_dir)])
@@ -138,7 +166,7 @@ def test_ac_f01_07_e2e_gitignore_lightrag(
 
 @pytest.mark.integration
 def test_ac_f01_08_e2e_gitignore_codegraph(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-08: E2E - install 後に .gitignore に .codegraph/ が追記される"""
     runner.invoke(app, ["install", "--project-dir", str(project_dir)])
@@ -151,7 +179,7 @@ def test_ac_f01_08_e2e_gitignore_codegraph(
 
 @pytest.mark.integration
 def test_ac_f01_09_e2e_gitignore_no_duplicate(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-09: E2E - .gitignore に .lightrag/ がすでにある場合は重複追記しない"""
     gitignore = project_dir / ".gitignore"
@@ -166,7 +194,7 @@ def test_ac_f01_09_e2e_gitignore_no_duplicate(
 
 @pytest.mark.integration
 def test_ac_f01_10_e2e_reinstall_preserves_lightrag(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-10: E2E - 再 install 時に既存の .lightrag/ が削除されない"""
     dummy = project_dir / ".lightrag" / "test.txt"
@@ -181,7 +209,7 @@ def test_ac_f01_10_e2e_reinstall_preserves_lightrag(
 
 @pytest.mark.integration
 def test_ac_f01_11_e2e_reinstall_index_readable(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-11: E2E - 再 install 後も .lightrag/ 配下が読み取り可能な状態を維持する"""
     dummy = project_dir / ".lightrag" / "index.bin"
@@ -196,7 +224,7 @@ def test_ac_f01_11_e2e_reinstall_index_readable(
 
 @pytest.mark.integration
 def test_ac_f01_12_e2e_other_mcp_entries_preserved(
-    project_dir: Path, fake_home: Path, env_with_key: None
+    project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
     """AC-F01-12: E2E - 他の MCP エントリが上書きされない"""
     claude_dir = fake_home / ".claude"

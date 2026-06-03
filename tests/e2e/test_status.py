@@ -14,13 +14,21 @@ runner = CliRunner()
 
 @pytest.fixture()
 def lightrag_ready():
-    """LightRAG が ready 状態をモックする"""
+    """LightRAG が ready 状態をモックする（複数エンドポイント対応）"""
+    import urllib.error
     import urllib.request
 
-    def fake_urlopen(url, timeout=None):
+    def fake_urlopen(req, timeout=None):
+        url = req.full_url if hasattr(req, "full_url") else str(req)
         resp = MagicMock()
         resp.__enter__ = lambda s: s
         resp.__exit__ = MagicMock(return_value=False)
+        if "pipeline_status" in url:
+            resp.read.return_value = b'{"busy": false}'
+        elif "documents" in url:
+            resp.read.return_value = b"[]"
+        else:
+            resp.read.return_value = b"ok"
         return resp
 
     with patch.object(urllib.request, "urlopen", fake_urlopen):

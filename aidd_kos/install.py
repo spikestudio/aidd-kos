@@ -95,9 +95,51 @@ class InstallOrchestrator:
 
     def start_lightrag_and_index(self) -> None:
         """Step 6-7: LightRAG 起動 → ドキュメントインデックス構築"""
-        # インデックス構築は別コマンド (aidd-kos index) に委譲
-        # ここでは LightRAG の作業ディレクトリを設定するのみ
-        pass
+        import time
+        import urllib.error
+
+        lightrag_url = os.environ.get("LIGHTRAG_URL", "http://localhost:9621")
+        lightrag_dir = self.project_dir / ".lightrag"
+
+        # Step 6: LightRAG サーバー起動（既に起動中なら再利用）
+        server_running = False
+        try:
+            urllib.request.urlopen(f"{lightrag_url}/health", timeout=2)
+            server_running = True
+        except (urllib.error.URLError, OSError):
+            pass
+
+        if not server_running:
+            subprocess.Popen(
+                [
+                    sys.executable,
+                    "-m",
+                    "lightrag.api.lightrag_server",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    "9621",
+                    "--working-dir",
+                    str(lightrag_dir),
+                ],
+                env={**os.environ, "LIGHTRAG_WORKING_DIR": str(lightrag_dir)},
+            )
+            # 起動待ち（最大 30 秒）
+            for _ in range(30):
+                try:
+                    urllib.request.urlopen(f"{lightrag_url}/health", timeout=1)
+                    server_running = True
+                    break
+                except (urllib.error.URLError, OSError):
+                    time.sleep(1)
+
+        # Step 7: ドキュメントをインデックス
+        if server_running:
+            from aidd_kos.index import IndexOrchestrator
+
+            idx = IndexOrchestrator(project_dir=self.project_dir)
+            result = idx.run()
+            print(f"[aidd-kos] インデックス完了: {result['file_count']} ファイル")
 
     def update_gitignore(self) -> None:
         """Step 8: .gitignore に .lightrag/ .codegraph/ を追記（重複なし）"""

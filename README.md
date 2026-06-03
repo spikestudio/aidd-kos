@@ -49,60 +49,25 @@ MCP Server（FastMCP + Aggregator）
 - [mise](https://mise.jdx.dev/) — ツールバージョン管理
 - OpenAI API キー（LightRAG のインデックス構築に必要）
 
-### インストール（Phase 1 完了後）
+### インストール
 
-> **Note:** `aidd-kos install` コマンドは Phase 1 で実装予定です。
-> 現在は以下の手動セットアップを使用してください。
+対象プロジェクトのルートで 1 コマンド実行するだけで完了します:
 
 ```bash
-# 対象プロジェクトのルートで実行
 uvx aidd-kos install
 ```
 
-上記コマンドは以下を自動実行します:
+上記コマンドは以下を全自動実行します:
 
-1. `.lightrag/` と `.codegraph/` を対象プロジェクト内に初期化
-2. `~/.claude/settings.json` に MCP サーバーを登録
-3. `.gitignore` に `.lightrag/` を追記
+1. `mise install` でツール（Python / uv / Node.js 等）をインストール
+2. `uv sync` で Python 依存（LightRAG / FastMCP 等）をインストール
+3. CodeGraph を初期化してコードインデックスを構築
+4. `~/.claude/settings.json` に MCP サーバーを登録
+5. LightRAG サーバーを起動してドキュメントをインデックス
+6. `.gitignore` に `.lightrag/` `.codegraph/` を追記
+7. 「Claude Code を再起動してください」と案内
 
-### 手動セットアップ（現在の方法）
-
-```bash
-# 1. リポジトリをクローン
-git clone https://github.com/spikestudio/aidd-kos.git
-cd aidd-kos
-
-# 2. 依存パッケージをインストール
-mise install
-uv sync
-
-# 3. 環境変数を設定
-cp .env.example .env
-# .env を編集して OPENAI_API_KEY を設定
-
-# 4. LightRAG サーバーを起動
-task server:start
-
-# 5. ドキュメントをインデックス
-task index -- /path/to/your/project
-```
-
-`~/.claude/settings.json` に以下を追加して Claude Code と接続:
-
-```json
-{
-  "mcpServers": {
-    "aidd-kos": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "mcp_server.server"],
-      "cwd": "/path/to/aidd-kos",
-      "env": {
-        "LIGHTRAG_URL": "http://localhost:9621"
-      }
-    }
-  }
-}
-```
+完了後に Claude Code を再起動すると `lightrag_query` / `codegraph_explore` が使えます。
 
 ### 環境変数
 
