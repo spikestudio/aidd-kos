@@ -7,14 +7,17 @@
 
 ## 1. ビジョン
 
-`aidd-kos` を導入するだけで、AI エージェントが開発プロジェクトの「コード・設計書・業務文脈」を横断的に理解・検索できるナレッジ OS が即座に稼働する。AI Agent は単一の MCP サーバーが提供するナレッジツール群を自律的に使い分け、必要な知識を自分で収集・推論しながら、開発を最速・最大効率で推進できる。開発者は `aidd-kos` を入れるだけでよく、ツール選定・設定・運用を意識しない。
+`uvx aidd-kos install` の 1 コマンドで、AI エージェントが開発プロジェクトの「コード・設計書・業務文脈」を
+横断的に理解・検索できるナレッジ OS が即座に稼働する。AI Agent は単一の MCP サーバーが提供する
+ナレッジツール群を自律的に使い分け、必要な知識を自分で収集・推論しながら、開発を最速・最大効率で推進できる。
+開発者はインストールするだけでよく、ツール選定・設定・運用を意識しない。
 
 ## 2. ビジネスゴール
 
 | # | ゴール | 測定指標 |
 |---|--------|---------|
 | 1 | AI Agent が自然言語でプロジェクト知識を横断検索できる | query P95 応答 < 2秒（1万ドキュメント規模）、関連ドキュメントの適合率 > 80% |
-| 2 | `aidd-kos` 導入から MCP 稼働まで 10 分以内 | 100 ドキュメント以下で `aidd-kos install` → `aidd-kos start` → MCP 疎通確認の所要時間（インデックス構築を除く） |
+| 2 | `aidd-kos` 導入から MCP 稼働まで 10 分以内 | 100 ドキュメント以下で `uvx aidd-kos install` → Claude Code 再起動 → MCP 疎通確認の所要時間（インデックス構築を除く） |
 | 3 | AI Agent が単一 MCP サーバー内のツールを自律的に使い分けて開発を推進できる | Agent が 1 タスク内で複数ナレッジツールを組み合わせて呼び出し、目的を達成できること（E2E テストで検証） |
 | 4 | `aidd-kos` のバージョンアップだけで、Agent が使えるナレッジエンジンが増え・改善される | 新バージョン導入後に既存 MCP 接続設定を変えずに新ツールが利用可能になること |
 
@@ -36,8 +39,8 @@
 
 | Phase | 名称 | スコープ概要 | 状態 |
 |-------|------|------------|------|
-| Phase 1 | Core MVP | LightRAG ドキュメント検索 + 単一 MCP サーバー基本実装（query_documents / get_status / list_documents）+ **`aidd-kos` CLI**（install / start / index / status）+ テスト・ドキュメント整備 | 実装完了、MVP 品質担保中（CLI は未実装） |
-| Phase 2 | Multi-Engine | **第 2・第 3 のナレッジエンジンを aidd-kos に実装**。CodeGraph（コード構造検索）・ADR 特化検索等を企画・実装し、MCP ツールとして公開。Agent が複数エンジンを使い分けて推論できる状態を確立 | 未着手 |
+| Phase 1 | Core MVP | **LightRAG（ドキュメント検索）+ CodeGraph（コード検索）を単一 MCP サーバーで公開**。`uvx aidd-kos install` 1 コマンドで対象プロジェクトへの導入完結（.lightrag/ + .codegraph/ 配置・MCP 登録・embedded 起動）。CLI（install / index / status）+ テスト・ドキュメント整備 | 一部実装完了。CLI・embedded 起動・install フロー・CodeGraph MCP 公開は未実装 |
+| Phase 2 | Multi-Engine | Phase 1 の 2 エンジンを基盤に、**第 3・第 4 のナレッジエンジンを追加実装**（ADR 特化検索・外部システム連携等）。Agent が使い分けて推論できる状態をさらに拡充 | 未着手 |
 | Phase 3 | Ecosystem | 外部システム連携エンジン（GitHub Issues / Confluence / Jira 等）・Embedding プロバイダー拡充・精度改善サイクルの確立 | 未着手 |
 
 ## 4.1 スコープ外
@@ -63,15 +66,16 @@
 
 ## 6. 制約事項
 
-- **技術的制約**: LightRAG は OpenAI API（Embedding / LLM）に依存。API コスト・レート制限が制約となる。LightRAG デフォルトポート 9621（`LIGHTRAG_URL` 環境変数で上書き可能）
+- **技術的制約**: LightRAG は OpenAI API（Embedding / LLM）に依存。API コスト・レート制限が制約となる
+- **配布制約**: GitHub Release 経由（PyPI は将来対応）。`uvx` または `pip install git+...` でインストール
 - **ビジネス制約**: スパイクスタジオの内部ツールとして開始し、OSS として公開（MIT ライセンス）
 - **リソース制約**: ソロ開発（1名）。Phase 1 MVP を優先
 
 ## 7. 前提条件
 
 - ユーザーが有効な OpenAI API キーを所持していること
-- Python 3.10 以上がインストール済みであること
-- LightRAG サーバーがローカルで起動可能であること（ポート 9621 が使用可能）
+- Python 3.10 以上 + uv がインストール済みであること
+- ポート 9621 が使用可能であること（LightRAG 内部起動用。環境変数 `LIGHTRAG_PORT` で変更可能）
 
 ## 8. リスク
 
@@ -92,12 +96,15 @@
 
 | 項目 | 方針 |
 |------|------|
-| 構成（Phase 1） | ローカル実行：単一 MCP サーバー（FastMCP）→ LightRAG REST API（localhost:9621）→ .lightrag/ |
+| 配布・インストール | GitHub Release 経由。対象プロジェクトのルートで `uvx aidd-kos install` の 1 コマンドで完結。~/.claude/settings.json へ MCP 登録・.lightrag/ 初期化・.gitignore 更新をすべて自動実行する |
+| ストレージ配置 | `.lightrag/`（ドキュメント知識）・`.codegraph/`（コード知識）はともに**対象プロジェクトのルート**に配置する。aidd-kos 自身のディレクトリには保存しない |
+| LightRAG 起動（embedded） | LightRAG は MCP サーバーのサブプロセスとして起動する。Claude Code が MCP サーバーを起動すると LightRAG も自動起動し、MCP サーバーが停止すると自動終了する。オペレーターはサーバー起動を意識しない |
+| 構成（Phase 1） | `uvx aidd-kos install` → MCP Server（FastMCP）起動 → LightRAG サブプロセス自動起動（localhost:9621）→ .lightrag/（対象プロジェクト内） |
 | 構成（Phase 2〜） | 単一 MCP サーバーが複数のナレッジエンジンをツールとして公開。どのエンジンを搭載するかは aidd-kos が企画・実装する。ユーザーはバージョンアップするだけで最新のエンジン群を得る |
 | ツール設計原則 | 各 MCP ツールに「いつ使うか（`when_to_use`）」「何を返すか」を明示する。Agent が迷わず選べる記述が品質基準 |
 | エンジン追加方針 | 新エンジンは aidd-kos のリリースとして提供する。ユーザー側の設定変更・追加作業は発生しない |
-| CLI（オペレーター向け） | `aidd-kos <command>` がオペレーター（人間開発者）の唯一の操作窓口。install / start / stop / index / status / update 等を提供。内部で uv / LightRAG 等を呼ぶ |
-| データフロー（Phase 1） | Claude Code → MCP stdio → FastMCP server → LightRAG API → .lightrag/ |
+| CLI（オペレーター向け） | `aidd-kos <command>` がオペレーター（人間開発者）の唯一の操作窓口。install / index / status / update を提供。LightRAG の直接操作は不要（embedded のため） |
+| データフロー（Phase 1） | Claude Code → MCP stdio → FastMCP server（LightRAG embedded）→ .lightrag/（対象プロジェクト） |
 | データフロー（Phase 2〜） | Claude Code → MCP stdio → FastMCP server → Agent が選んだツール → {LightRAG, CodeGraph, ...} |
 | 外部連携 | Phase 1: OpenAI API のみ。Phase 2〜: Embedding プロバイダー選択肢を aidd-kos が実装・提供 |
 
@@ -108,10 +115,13 @@
 | カテゴリ | 採用技術 / バージョン | 選定理由 |
 |---------|---------------------|---------|
 | 言語 | Python 3.10+ | LightRAG / FastMCP が Python。型ヒント対応・async サポート充実 |
-| RAG フレームワーク | LightRAG (lightrag-hku) 1.5+ | Vector + Graph の Dual-Level Retrieval。更新性能・検索速度が AI Agent 用途に最適 |
+| Doc Intelligence | LightRAG (lightrag-hku) 1.5+ | Vector + Graph の Dual-Level Retrieval。更新性能・検索速度が AI Agent 用途に最適 |
+| Code Intelligence | CodeGraph (@colbymchenry/codegraph) | AST・呼び出しグラフ・シンボル検索。npx で実行、MCP server として AI Agent に公開 |
 | MCP フレームワーク | FastMCP 2.0+ | Python ネイティブ MCP サーバー実装。最小コードで MCP ツール公開可能 |
-| DB / ストレージ | LightRAG ローカルストレージ（.lightrag/） | グラフ + ベクトルをローカルファイルに保存。DB サーバー不要 |
-| インフラ | ローカル実行（Docker オプション） | 開発者ツールとして導入摩擦を最小化 |
+| Doc ストレージ | .lightrag/（対象プロジェクト内） | グラフ + ベクトルをローカルファイルに保存。DB サーバー不要 |
+| Code ストレージ | .codegraph/（対象プロジェクト内） | コード AST インデックスをローカルに保存 |
+| 配布 | GitHub Release + uvx | `uvx aidd-kos install` 1 コマンドでインストール完結 |
+| インフラ | ローカル実行 | 開発者ツールとして導入摩擦を最小化 |
 | CI/CD | GitHub Actions | aidd-fw 標準 |
 | パッケージマネージャー | uv | Python 高速パッケージマネージャー。仮想環境管理含む |
 | ツールバージョン管理 | mise | aidd-fw 標準（固定）|

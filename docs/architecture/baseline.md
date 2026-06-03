@@ -10,44 +10,51 @@
 
 ## C4 Container 図
 
-C4 Model Level 2: Container 図（Phase 1 現在の構成）
+C4 Model Level 2: Container 図（Phase 1 目標構成）
+
+> **インストールフロー:** 対象プロジェクトのルートで `uvx aidd-kos install` を実行すると、
+> .lightrag/ + .codegraph/ を対象プロジェクト内に初期化し、~/.claude/settings.json に MCP 登録する。
 
 ```mermaid
 C4Container
     title aidd-kos — C4 Container 図（Phase 1）
 
     Person(aiAgent, "AI Agent", "Claude Code / Cursor / Copilot 等")
-    Person(operator, "オペレーター", "人間の開発者（インストール・管理）")
+    Person(operator, "オペレーター", "人間の開発者（1 回だけ install を実行）")
 
-    System_Boundary(kos, "aidd-kos") {
-        Container(cli, "aidd-kos CLI", "Python / Typer", "install / start / stop / index / status（Phase 1 実装予定）")
-        Container(mcpServer, "MCP Server", "Python / FastMCP", "AI Agent にナレッジツールを MCP stdio で公開")
-        Container(lightrag, "Doc Intelligence Engine", "lightrag-hku", "ドキュメントの Entity/Relation 抽出・Dual-Level 検索（REST API localhost:9621）")
-        Container(codegraph, "Code Intelligence Engine", "CodeGraph (npx)", "コードの AST・呼び出しグラフ・シンボル検索（MCP server で AI Agent が直接呼び出す）")
-        ContainerDb(lightragStore, ".lightrag/", "ローカルファイル", "グラフ DB + ベクトル DB（Entity/Relation + Embedding）")
-        ContainerDb(codegraphStore, ".codegraph/", "ローカルファイル", "コード AST インデックス（72 nodes, 92 edges）")
+    System_Boundary(target, "対象プロジェクト") {
+        ContainerDb(lightragStore, ".lightrag/", "ローカルファイル", "グラフ DB + ベクトル DB（対象プロジェクト内）")
+        ContainerDb(codegraphStore, ".codegraph/", "ローカルファイル", "コード AST インデックス（対象プロジェクト内）")
+    }
+
+    System_Boundary(kos, "aidd-kos（uvx でインストール）") {
+        Container(cli, "aidd-kos CLI", "Python / Typer", "install / index / status を提供。uvx aidd-kos install で MCP 登録・ストレージ初期化を自動実行")
+        Container(mcpServer, "MCP Server", "Python / FastMCP", "AI Agent にナレッジツールを MCP stdio で公開。起動時に LightRAG を embedded で自動起動")
+        Container(lightrag, "Doc Intelligence Engine", "lightrag-hku", "MCP Server のサブプロセスとして embedded 起動。ドキュメントの Entity/Relation 抽出・Dual-Level 検索")
+        Container(codegraph, "Code Intelligence Engine", "CodeGraph (npx)", "コードの AST・呼び出しグラフ・シンボル検索。MCP Server が npx 経由で公開")
     }
 
     System_Ext(openai, "OpenAI API", "Embedding 生成（text-embedding-3-small）・LLM（gpt-4o-mini）")
-    System_Ext(projectDocs, "プロジェクトドキュメント", "Markdown / テキストファイル（インデックス対象）")
-    System_Ext(projectCode, "プロジェクトコード", "Python / 任意言語のソースコード（インデックス対象）")
+    System_Ext(projectDocs, "プロジェクトドキュメント", "Markdown / テキストファイル")
+    System_Ext(projectCode, "プロジェクトコード", "Python / 任意言語のソースコード")
 
-    Rel(aiAgent, mcpServer, "MCP stdio", "query_documents / get_status / list_documents")
-    Rel(operator, cli, "CLI", "aidd-kos install/start/stop/index/status")
-    Rel(cli, lightrag, "HTTP / subprocess", "サーバー起動・停止・インデックス指示")
-    Rel(cli, codegraph, "npx CLI", "codegraph init / index / status")
-    Rel(mcpServer, lightrag, "HTTP", "localhost:9621（LIGHTRAG_URL 環境変数でオーバーライド可能）")
-    Rel(lightrag, lightragStore, "R/W", "グラフ・ベクトル読み書き（排他制御: サーバー経由のみ推奨）")
-    Rel(codegraph, codegraphStore, "R/W", "AST インデックス読み書き")
-    Rel(lightrag, openai, "HTTPS", "Embedding / LLM API（レート制限・コスト発生）")
-    Rel(projectDocs, lightrag, "Read", "インデックス対象ドキュメント収集")
+    Rel(aiAgent, mcpServer, "MCP stdio", "query_documents / search_code / get_status 等")
+    Rel(operator, cli, "CLI（1 回のみ）", "uvx aidd-kos install")
+    Rel(cli, lightragStore, "初期化", ".lightrag/ を対象プロジェクト内に作成")
+    Rel(cli, codegraphStore, "初期化", ".codegraph/ を対象プロジェクト内に作成（npx codegraph init）")
+    Rel(mcpServer, lightrag, "subprocess", "MCP Server 起動時に自動起動・終了時に自動停止（embedded）")
+    Rel(mcpServer, codegraph, "npx MCP serve", "CodeGraph MCP サーバーを起動し AI Agent に公開")
+    Rel(lightrag, lightragStore, "R/W", "グラフ・ベクトル読み書き（cwd = 対象プロジェクト）")
+    Rel(codegraph, codegraphStore, "R/W", "AST インデックス読み書き（cwd = 対象プロジェクト）")
+    Rel(lightrag, openai, "HTTPS", "Embedding / LLM API")
+    Rel(projectDocs, lightrag, "Read", "インデックス対象ドキュメント")
     Rel(projectCode, codegraph, "Read", "静的解析・インデックス対象コード")
 ```
 
 ### Phase 2〜 への拡張
 
-Phase 2（Multi-Engine）では MCP Server が複数の Knowledge Engine をツールとして公開する。
-CodeGraph は既に Phase 1 で稼働しているが、MCP ツールとしての公開は Phase 2 で実施する。
+Phase 1 で LightRAG（ドキュメント）+ CodeGraph（コード）の 2 エンジンを確立した後、
+Phase 2 では第 3・第 4 のエンジンを追加実装する。
 
 ```text
 [AI Agent]
@@ -55,9 +62,10 @@ CodeGraph は既に Phase 1 で稼働しているが、MCP ツールとしての
 [MCP Server (FastMCP)]
     ↓ (Agent が選択)
 +-----------------------------------+
-|  Doc Intelligence (LightRAG)      |
-|  Code Intelligence (CodeGraph)    |
-|  Future Engine N                  |
+|  Doc Intelligence (LightRAG)      |  ← Phase 1
+|  Code Intelligence (CodeGraph)    |  ← Phase 1
+|  Engine 3 (ADR 検索等)             |  ← Phase 2
+|  Engine N                         |  ← Phase 3〜
 +-----------------------------------+
 ```
 
@@ -68,7 +76,7 @@ CodeGraph は既に Phase 1 で稼働しているが、MCP ツールとしての
 | レイヤー | 責務 | 現実装モジュール | 依存先 | 禁止依存 |
 |--------|------|--------------|--------|---------|
 | **Interface Layer**（インターフェース層） | MCP ツール公開（FastMCP）・CLI コマンド（Typer）。入出力変換のみ、ビジネスロジックなし | `mcp_server/server.py`（MCP）、`aidd_kos/cli.py`（未実装） | Application Layer | Domain / Infrastructure への直接アクセス禁止 |
-| **Application Layer**（アプリケーション層） | クエリ統括・インデックス管理・サーバーライフサイクル管理 | `scripts/index.py`、`scripts/server.py`、`scripts/stop.py`、`scripts/status.py` | Knowledge Engine Layer | Infrastructure への直接アクセス禁止 |
+| **Application Layer**（アプリケーション層） | クエリ統括・インデックス管理。サーバーライフサイクルは MCP Server が担う（embedded） | `scripts/index.py`、`scripts/status.py`、`aidd_kos/install.py`（未実装） | Knowledge Engine Layer | Infrastructure への直接アクセス禁止 |
 | **Knowledge Engine Layer**（ナレッジエンジン層） | Doc Intelligence（LightRAG）・Code Intelligence（CodeGraph）の知識処理・検索・グラフ操作 | LightRAG REST API（外部プロセス）、CodeGraph（外部プロセス） | Infrastructure Layer | Interface / Application への逆依存禁止 |
 | **Infrastructure Layer**（インフラ層） | OpenAI API クライアント・LightRAG REST API クライアント・ファイルシステムアクセス | `httpx`（LightRAG HTTP）、`urllib.request`（LightRAG REST）、LightRAG 内部 OpenAI クライアント | 外部サービス（OpenAI API / ファイルシステム） | 上位レイヤーへの逆依存禁止 |
 
@@ -99,7 +107,10 @@ Infrastructure Layer
 | TD-01 | `httpx.AsyncClient(timeout=60)` が NFR P95 < 2秒と乖離。タイムアウトが NFR 違反を検知できない | `mcp_server/server.py` L34 | 環境変数 `LIGHTRAG_QUERY_TIMEOUT_MS`（デフォルト 5000ms）でオーバーライド可能にし、タイムアウト時に `{"error": "QUERY_TIMEOUT"}` を返す。Phase 1 完了前に対応 |
 | TD-02 | MCP ツール層でのエラーが stderr に出力されず NFR（3 秒以内 stderr 出力）に不適合 | `mcp_server/server.py` except 節 | MCP ツールのエラーハンドラーで `sys.stderr.write()` によるエラーコード + 対処方法を出力。Phase 1 完了前に対応 |
 | TD-03 | インデックスの二重書き込み経路（REST API / Python API 直接）による競合リスク。サーバー起動中の Python API 経路はインデックス破損の可能性 | `scripts/index.py` L100-117 | サーバー起動中は Python API 直接経路を禁止（`sys.exit(1)` で明示失敗）し、ADR として設計判断を記録。Phase 2 前に対応 |
-| TD-04 | `aidd-kos` CLI（Typer）が未実装。C4 図には記載済みだが `pyproject.toml` にエントリポイントなし | `pyproject.toml` | Phase 1 完了条件として CLI 実装を追加。`aidd_kos/cli.py` を新規作成し `pyproject.toml` にエントリポイントを登録する |
+| TD-04 | `aidd-kos` CLI（Typer）が未実装。`pyproject.toml` にエントリポイントなし | `pyproject.toml` | Phase 1 完了条件。`aidd_kos/cli.py` を新規作成（install / index / status）し `pyproject.toml` にエントリポイントを登録する |
+| TD-05 | LightRAG の embedded 起動（サブプロセス管理）が未実装。現状は外部プロセスを手動起動 | `mcp_server/server.py` | Phase 1 完了条件。MCP Server の lifespan フックで LightRAG サブプロセスを起動・ヘルスチェック・終了させる |
+| TD-06 | `.lightrag/` のストレージ先が aidd-kos 自身のディレクトリ（`PROJECT_ROOT`）になっており対象プロジェクトに配置されていない | `scripts/index.py` L12、`mcp_server/server.py` 環境変数 | Phase 1 完了条件。`AIDD_KOS_PROJECT_DIR` 環境変数で対象プロジェクトのパスを受け取り、`WORKING_DIR` を対象プロジェクト内の `.lightrag/` に変更する |
+| TD-07 | `aidd-kos install` コマンドが未実装。~/.claude/settings.json への MCP 登録・ストレージ初期化・.gitignore 更新を自動化する必要がある | 未実装 | Phase 1 完了条件。`aidd_kos/install.py` を実装し `aidd-kos install` コマンドとして公開する |
 
 ## Analysis Notes
 
@@ -129,8 +140,10 @@ Infrastructure Layer
 
 ### 設計上の仮定
 
-- LightRAG は外部プロセスとして動作し、REST API 経由でのみアクセスする（プロセス間の排他制御は LightRAG サーバー側に委譲）
-- CodeGraph は Phase 1 では Operator の管理ツールとして稼働。AI Agent への MCP 公開は Phase 2 で実施
+- LightRAG は MCP Server のサブプロセス（embedded）として動作し、REST API 経由でのみアクセスする。排他制御は LightRAG サーバー側に委譲
+- CodeGraph は Phase 1 MVP で AI Agent への MCP 公開まで完結する（Phase 2 待ちではない）
+- `.lightrag/` と `.codegraph/` は**対象プロジェクトのルート**に配置する。aidd-kos 自身のディレクトリには保存しない
+- `aidd-kos install` は対象プロジェクトの cwd を基準に MCP server の環境変数（`AIDD_KOS_PROJECT_DIR`）を設定する
 - OpenAI API のリトライは LightRAG 内部実装に委譲（外部ライブラリのため確認不可）
 
 ## 参照 ADR
