@@ -21,6 +21,7 @@ from fastmcp.client.transports import NpxStdioTransport
 from fastmcp.server import create_proxy
 
 from aidd_kos.errors import (
+    LIGHTRAG_INDEX_NOT_FOUND,
     LIGHTRAG_STARTUP_FAILED,
     LIGHTRAG_UNAVAILABLE,
     QUERY_TIMEOUT,
@@ -126,6 +127,19 @@ async def lightrag_query(query: str, mode: str = "hybrid") -> str:
 
         emit_error(INVALID_MODE, f"有効な mode: {', '.join(sorted(_ALLOWED_MODES))}")
         return f"INVALID_MODE: '{mode}' は無効です。有効な値: {', '.join(sorted(_ALLOWED_MODES))}"
+
+    lightrag_dir = Path.cwd() / ".lightrag"
+    index_ready = lightrag_dir.exists() and any(
+        f.suffix in {".json", ".graphml"} for f in lightrag_dir.iterdir() if f.is_file()
+    )
+    if not index_ready:
+        emit_error(
+            LIGHTRAG_INDEX_NOT_FOUND,
+            "aidd-kos index を実行してインデックスを構築してください",
+        )
+        return (
+            "LIGHTRAG_INDEX_NOT_FOUND: インデックスが未構築です。aidd-kos index を実行してください"
+        )
 
     try:
         async with httpx.AsyncClient(timeout=_QUERY_TIMEOUT_S) as client:
