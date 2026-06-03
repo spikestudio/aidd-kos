@@ -6,6 +6,9 @@ import os
 import shutil
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from aidd_kos.claude_settings import ClaudeSettings
@@ -95,8 +98,6 @@ class InstallOrchestrator:
 
     def start_lightrag_and_index(self) -> None:
         """Step 6-7: LightRAG 起動 → ドキュメントインデックス構築"""
-        import time
-        import urllib.request
 
         lightrag_url = os.environ.get("LIGHTRAG_URL", "http://localhost:9621")
         lightrag_dir = self.project_dir / ".lightrag"

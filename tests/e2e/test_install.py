@@ -60,8 +60,24 @@ def mock_subprocesses(monkeypatch: pytest.MonkeyPatch):
         resp.read.return_value = b'{"status": "ok"}'
         return resp
 
+    def fake_subprocess_run(cmd, **kwargs):
+        """codegraph init/index 呼び出し時に .codegraph/ を作成するモック"""
+        is_codegraph = any("codegraph" in str(part) for part in cmd)
+        is_init_or_index = "init" in cmd or "index" in cmd
+        if is_codegraph and is_init_or_index:
+            for part in cmd:
+                s = str(part)
+                if s not in ("npx", "@colbymchenry/codegraph", "init", "index"):
+                    from pathlib import Path
+
+                    target = Path(s)
+                    target.mkdir(exist_ok=True)
+                    (target / ".codegraph").mkdir(exist_ok=True)
+                    break
+        return mock_result
+
     with (
-        patch("aidd_kos.install.subprocess.run", return_value=mock_result),
+        patch("aidd_kos.install.subprocess.run", side_effect=fake_subprocess_run),
         patch("aidd_kos.install.subprocess.Popen"),
         patch("aidd_kos.install.urllib.request.urlopen", fake_urlopen),
         patch("aidd_kos.index.urllib.request.urlopen", fake_urlopen),
