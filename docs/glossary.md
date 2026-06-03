@@ -26,7 +26,7 @@
 
 **定義**: Vector（ベクトル検索）と Graph（グラフ検索）を組み合わせた Dual-Level Retrieval を実現する RAG フレームワーク（lightrag-hku）。更新性能と検索速度が AI Agent 用途に最適化されている。
 
-**用例**: LightRAG はドキュメントを Entity と Relation に分解してナレッジグラフに格納し、query_documents 実行時に Vector と Graph の両経路で関連情報を取得する。
+**用例**: LightRAG はドキュメントを Entity と Relation に分解してナレッジグラフに格納し、lightrag_query 実行時に Vector と Graph の両経路で関連情報を取得する。
 
 ---
 
@@ -42,7 +42,7 @@
 
 **定義**: AI エージェント（Claude Code / Claude Desktop 等）が外部ツールやデータソースと通信するための標準プロトコル。aidd-kos では stdio 経由で FastMCP サーバーへ接続し、ナレッジ検索ツールを提供する。
 
-**用例**: Claude Code は MCP stdio を経由して aidd-kos の query_documents ツールを呼び出し、プロジェクトドキュメントを検索する。
+**用例**: Claude Code は MCP stdio を経由して aidd-kos の lightrag_query ツールを呼び出し、プロジェクトドキュメントを検索する。
 
 ---
 
@@ -50,7 +50,7 @@
 
 **定義**: Python ネイティブの MCP サーバー実装フレームワーク（バージョン 2.0+）。最小限のコードで MCP ツールを公開でき、aidd-kos の MCP インターフェース層として採用されている。
 
-**用例**: FastMCP を使用することで、query_documents / get_status / list_documents の 3 つの MCP ツールを簡潔に定義・公開している。
+**用例**: FastMCP を使用することで、lightrag_query / lightrag_list / kos_status の 3 つの MCP ツールを簡潔に定義・公開している。
 
 ---
 
@@ -74,7 +74,7 @@
 
 **定義**: LightRAG がドキュメントから抽出する知識の基本単位（概念・人物・技術名・機能名等）。ナレッジグラフのノードとして格納される。
 
-**用例**: "FastMCP"・"query_documents"・"Dual-Level Retrieval" はそれぞれ Entity として抽出され、相互の Relation とともにナレッジグラフに保存される。
+**用例**: "FastMCP"・"lightrag_query"・"Dual-Level Retrieval" はそれぞれ Entity として抽出され、相互の Relation とともにナレッジグラフに保存される。
 
 ---
 
@@ -82,31 +82,43 @@
 
 **定義**: LightRAG がドキュメントから抽出する Entity 間の意味的な結びつき。ナレッジグラフのエッジとして格納され、Entity 間の文脈を保持する。
 
-**用例**: "FastMCP が MCP ツールを公開する" という Relation により、query_documents と FastMCP の依存関係をグラフ検索で辿ることができる。
+**用例**: "FastMCP が MCP ツールを公開する" という Relation により、lightrag_query と FastMCP の依存関係をグラフ検索で辿ることができる。
 
 ---
 
-### query_documents
+### lightrag_query
 
-**定義**: aidd-kos が提供する MCP ツールの一つ。自然言語クエリを受け取り、LightRAG の Dual-Level Retrieval で関連ドキュメントを検索・返却する。P95 応答時間 2 秒未満（1 万ドキュメント規模）が目標値。
+**定義**: aidd-kos が提供する MCP ツール。自然言語クエリで LightRAG の Dual-Level Retrieval を使い
+関連ドキュメントを返却する。P95 応答時間 2 秒未満（1 万ドキュメント規模）が目標値。
+旧名称: `query_documents`（Epic #2 で改名）。
 
-**用例**: Claude Code が query_documents を呼び出し「このプロジェクトの認証方式は？」と問い合わせると、関連する ADR や設計書が返却される。
-
----
-
-### get_status
-
-**定義**: aidd-kos が提供する MCP ツールの一つ。LightRAG インデックスの現在の状態（インデックス済みドキュメント数・ストレージ状況等）を即時確認する。
-
-**用例**: get_status を呼び出すことで、インデックス構築が完了しているかどうかを MCP 経由で即座に確認できる。
+**用例**: AI Agent が lightrag_query を呼び出し「このプロジェクトの認証方式は？」と問い合わせると、関連する ADR や設計書が返却される。
 
 ---
 
-### list_documents
+### lightrag_list
 
-**定義**: aidd-kos が提供する MCP ツールの一つ。インデックスに登録済みのドキュメント一覧を返却する。
+**定義**: aidd-kos が提供する MCP ツール。インデックスに登録済みのドキュメント一覧を返却する。
+旧名称: `list_documents`（Epic #2 で改名）。
 
-**用例**: list_documents を実行してインデックス対象のドキュメントが正しく登録されているか確認した上で、query_documents の検索精度を評価する。
+**用例**: lightrag_list を実行してインデックス対象のドキュメントが正しく登録されているか確認した上で、lightrag_query の検索精度を評価する。
+
+---
+
+### kos_status
+
+**定義**: aidd-kos が提供する MCP ツール。LightRAG・CodeGraph 両エンジンの状態（ready/unavailable/indexing）・
+インデックス日時・利用可能ツール一覧を統合して返却する。旧名称: `get_status`（Epic #2 で改名）。
+
+**用例**: kos_status を呼び出すことで、全ナレッジエンジンの稼働状態と利用可能ツールを MCP 経由で即座に確認できる。
+
+---
+
+### QUERY_TIMEOUT
+
+**定義**: aidd-kos のエラーコード（ADR-001 準拠: `{COMPONENT}_{ERROR_TYPE}` 形式）。lightrag_query が `LIGHTRAG_QUERY_TIMEOUT_MS`（デフォルト 5000ms）以内に応答しなかった場合に返却される。
+
+**用例**: 大規模インデックスでのクエリが 5 秒を超えた場合、AI Agent は `QUERY_TIMEOUT: クエリがタイムアウトしました` を受け取り、`LIGHTRAG_QUERY_TIMEOUT_MS` の調整を案内される。
 
 ---
 
