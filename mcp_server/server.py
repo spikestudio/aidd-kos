@@ -192,13 +192,16 @@ async def lightrag_list(limit: int = 20) -> str:
             )
             resp.raise_for_status()
             data = resp.json()
-            docs = data.get("statuses") or []
+            raw = data.get("statuses") or []
+            # LightRAG v1.5.0: statuses が {status: [doc,...]} 形式の辞書になる場合がある
+            docs = [d for group in raw.values() for d in group] if isinstance(raw, dict) else raw
             docs = docs[:limit]
             if not docs:
                 return "インデックス済みドキュメントなし"
             lines = [
-                f"- {d.get('file_path', d.get('id', '?'))} ({d.get('status', '?')})"
-                for d in docs[:limit]
+                f"- {d.get('content_summary', d.get('file_path', d.get('id', '?')))[:80]}"
+                f" ({d.get('status', '?')})"
+                for d in docs
             ]
             return f"インデックス済みドキュメント ({len(docs)} 件):\n" + "\n".join(lines)
     except (httpx.ConnectError, httpx.HTTPStatusError, Exception) as e:
