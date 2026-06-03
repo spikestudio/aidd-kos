@@ -16,7 +16,7 @@
 | 1 | AI Agent が自然言語でプロジェクト知識を横断検索できる | query P95 応答 < 2秒（1万ドキュメント規模）、関連ドキュメントの適合率 > 80% |
 | 2 | `aidd-kos` 導入から MCP 稼働まで 10 分以内 | 100 ドキュメント以下で `uv sync` → `task server:start` → MCP 疎通確認の所要時間（インデックス構築を除く） |
 | 3 | AI Agent が単一 MCP サーバー内のツールを自律的に使い分けて開発を推進できる | Agent が 1 タスク内で複数ナレッジツールを組み合わせて呼び出し、目的を達成できること（E2E テストで検証） |
-| 4 | ナレッジエンジンをプラグイン形式で追加でき、追加したツールが即座に Agent から利用可能になる | 新エンジン追加が設定ファイルのみで完了し、MCP ツールとして自動公開されること |
+| 4 | `aidd-kos` のバージョンアップだけで、Agent が使えるナレッジエンジンが増え・改善される | 新バージョン導入後に既存 MCP 接続設定を変えずに新ツールが利用可能になること |
 
 ## 3. 対象ユーザー / ペルソナ
 
@@ -36,9 +36,9 @@
 
 | Phase | 名称 | スコープ概要 | 状態 |
 |-------|------|------------|------|
-| Phase 1 | Core MVP | LightRAG インデックス + 単一 MCP サーバー基本実装（query_documents / get_status / list_documents）+ テスト・ドキュメント整備 | 実装完了、MVP 品質担保中 |
-| Phase 2 | Plugin Orchestration | **プラグインアーキテクチャ確立**。ナレッジエンジン（LightRAG / CodeGraph 等）を差し替え可能な形に抽象化。MCP エンドポイント 1 本を維持しつつ複数エンジンを束ねる Knowledge Router を実装。マルチプロジェクト対応 | 未着手 |
-| Phase 3 | Ecosystem | 外部システム連携プラグイン（GitHub Issues / ADR / Confluence / Jira）・Embedding プロバイダー拡充・GraphRAG / Neo4j オプション統合 | 未着手 |
+| Phase 1 | Core MVP | LightRAG ドキュメント検索 + 単一 MCP サーバー基本実装（query_documents / get_status / list_documents）+ テスト・ドキュメント整備 | 実装完了、MVP 品質担保中 |
+| Phase 2 | Multi-Engine | **第 2・第 3 のナレッジエンジンを aidd-kos に実装**。CodeGraph（コード構造検索）・ADR 特化検索等を企画・実装し、MCP ツールとして公開。Agent が複数エンジンを使い分けて推論できる状態を確立 | 未着手 |
+| Phase 3 | Ecosystem | 外部システム連携エンジン（GitHub Issues / Confluence / Jira 等）・Embedding プロバイダー拡充・精度改善サイクルの確立 | 未着手 |
 
 ## 4.1 スコープ外
 
@@ -85,20 +85,20 @@
 
 ## 9. アーキテクチャ方針
 
-<!-- 設計の核心: aidd-kos は AI Agent が自律的に使い分けられる
-     "ナレッジツール群" を単一 MCP サーバーで提供する。
-     Agent はツールの存在と用途を知った上で、自分で選んで呼び出す（Agentic RAG）。
-     "何を使うか" は Agent が判断し、"どう動かすか" は aidd-kos が担う。 -->
+<!-- 設計の核心: aidd-kos は "何を使うか" も含めて責任を持つ Knowledge OS。
+     どのエンジンを実装するかは aidd-kos の開発判断であり、ユーザーは関与しない。
+     Agent はツールの説明を読んで自律的に選んで呼び出す（Agentic RAG）。
+     "何を使うか" は Agent が判断し、"どう動かすか・何を用意するか" は aidd-kos が担う。 -->
 
 | 項目 | 方針 |
 |------|------|
 | 構成（Phase 1） | ローカル実行：単一 MCP サーバー（FastMCP）→ LightRAG REST API（localhost:9621）→ .lightrag/ |
-| 構成（Phase 2〜） | 単一 MCP サーバーがナレッジエンジンごとに明確に定義されたツールを公開。Agent はツールの説明を読んで自律的に選択・組み合わせる |
+| 構成（Phase 2〜） | 単一 MCP サーバーが複数のナレッジエンジンをツールとして公開。どのエンジンを搭載するかは aidd-kos が企画・実装する。ユーザーはバージョンアップするだけで最新のエンジン群を得る |
 | ツール設計原則 | 各 MCP ツールに「いつ使うか（`when_to_use`）」「何を返すか」を明示する。Agent が迷わず選べる記述が品質基準 |
-| プラグイン設計 | 各ナレッジエンジンは共通インターフェース（`KnowledgeEngine` プロトコル）を実装。設定ファイルで有効化・無効化可能。追加したエンジンは MCP ツールとして自動公開される |
-| データフロー（Phase 1） | Claude Code → MCP stdio → FastMCP server → HTTP → LightRAG API → .lightrag/ |
+| エンジン追加方針 | 新エンジンは aidd-kos のリリースとして提供する。ユーザー側の設定変更・追加作業は発生しない |
+| データフロー（Phase 1） | Claude Code → MCP stdio → FastMCP server → LightRAG API → .lightrag/ |
 | データフロー（Phase 2〜） | Claude Code → MCP stdio → FastMCP server → Agent が選んだツール → {LightRAG, CodeGraph, ...} |
-| 外部連携 | Phase 1: OpenAI API のみ。Phase 2〜: Embedding プロバイダーをプラグイン化 |
+| 外部連携 | Phase 1: OpenAI API のみ。Phase 2〜: Embedding プロバイダー選択肢を aidd-kos が実装・提供 |
 
 ## 10. 技術スタック
 
