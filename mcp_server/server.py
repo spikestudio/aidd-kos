@@ -6,19 +6,90 @@ CodeGraph ツール（codegraph_*）を FastMCP process proxy で統合する（
 
 from __future__ import annotations
 
+import asyncio
 import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.client.transports import NpxStdioTransport
 from fastmcp.server import create_proxy
 
-from aidd_kos.errors import LIGHTRAG_UNAVAILABLE, QUERY_TIMEOUT, emit_error
+from aidd_kos.errors import (
+    LIGHTRAG_STARTUP_FAILED,
+    LIGHTRAG_UNAVAILABLE,
+    QUERY_TIMEOUT,
+    emit_error,
+)
 
 LIGHTRAG_URL = os.environ.get("LIGHTRAG_URL", "http://localhost:9621")
 LIGHTRAG_API_KEY = os.environ.get("LIGHTRAG_API_KEY", "")
 _QUERY_TIMEOUT_S = float(os.environ.get("LIGHTRAG_QUERY_TIMEOUT_MS", "5000")) / 1000.0
 _ALLOWED_MODES = frozenset({"hybrid", "mix", "local", "global", "naive"})
+_LIGHTRAG_PORT = int(os.environ.get("LIGHTRAG_PORT", "9621"))
+_LIGHTRAG_STARTUP_TIMEOUT_S = 30
+
+
+@asynccontextmanager
+async def _lifespan(app):
+    lightrag_dir = Path.cwd() / ".lightrag"
+    lightrag_dir.mkdir(exist_ok=True)
+    print(f"[aidd-kos] LightRAG embedded 起動: {lightrag_dir}", flush=True)
+
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "lightrag.api.lightrag_server",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(_LIGHTRAG_PORT),
+            "--working-dir",
+            str(lightrag_dir),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+
+    health_url = f"http://127.0.0.1:{_LIGHTRAG_PORT}/health"
+    started = False
+    for _ in range(_LIGHTRAG_STARTUP_TIMEOUT_S):
+        if proc.poll() is not None:
+            break
+        try:
+            urllib.request.urlopen(health_url, timeout=1)
+            started = True
+            break
+        except (urllib.error.URLError, OSError):
+            await asyncio.sleep(1)
+
+    if not started:
+        proc.terminate()
+        emit_error(
+            LIGHTRAG_STARTUP_FAILED,
+            "LightRAG の起動に失敗しました。ポート競合・依存関係の確認を行ってください。",
+        )
+        raise RuntimeError("LIGHTRAG_STARTUP_FAILED")
+
+    print("[aidd-kos] LightRAG 起動完了", flush=True)
+    try:
+        yield
+    finally:
+        print("[aidd-kos] LightRAG 停止中...", flush=True)
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        print("[aidd-kos] LightRAG 停止完了", flush=True)
+
 
 mcp = FastMCP(
     name="aidd-kos",
@@ -28,6 +99,7 @@ mcp = FastMCP(
         "Use lightrag_list to see indexed documents.\n"
         "Use kos_status to check engine health."
     ),
+    lifespan=_lifespan,
 )
 
 
