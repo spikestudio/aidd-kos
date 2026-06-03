@@ -29,7 +29,7 @@ C4Container
 
     System_Boundary(kos, "aidd-kos（uvx でインストール）") {
         Container(cli, "aidd-kos CLI", "Python / Typer", "install / index / status を提供。uvx aidd-kos install で MCP 登録・ストレージ初期化を自動実行")
-        Container(mcpServer, "MCP Server", "Python / FastMCP", "AI Agent にナレッジツールを MCP stdio で公開。起動時に LightRAG を embedded で自動起動")
+        Container(mcpServer, "MCP Server", "Python / FastMCP", "lightrag_* / codegraph_* ツールを単一エンドポイントで公開。起動時に LightRAG を embedded で自動起動し CodeGraph を proxy")
         Container(lightrag, "Doc Intelligence Engine", "lightrag-hku", "MCP Server のサブプロセスとして embedded 起動。ドキュメントの Entity/Relation 抽出・Dual-Level 検索")
         Container(codegraph, "Code Intelligence Engine", "CodeGraph (npx)", "コードの AST・呼び出しグラフ・シンボル検索。MCP Server が npx 経由で公開")
     }
@@ -38,7 +38,7 @@ C4Container
     System_Ext(projectDocs, "プロジェクトドキュメント", "Markdown / テキストファイル")
     System_Ext(projectCode, "プロジェクトコード", "Python / 任意言語のソースコード")
 
-    Rel(aiAgent, mcpServer, "MCP stdio", "query_documents / search_code / get_status 等")
+    Rel(aiAgent, mcpServer, "MCP stdio", "lightrag_query / lightrag_list / codegraph_explore / codegraph_impact 等")
     Rel(operator, cli, "CLI（1 回のみ）", "uvx aidd-kos install")
     Rel(cli, lightragStore, "初期化", ".lightrag/ を対象プロジェクト内に作成")
     Rel(cli, codegraphStore, "初期化", ".codegraph/ を対象プロジェクト内に作成（npx codegraph init）")
