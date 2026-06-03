@@ -172,6 +172,7 @@ Infrastructure Layer
 | 番号 | テーマ |
 |------|--------|
 | [ADR-001](./adr/ADR-001-error-code-convention.md) | aidd-kos エラーコード体系の統一設計（`{COMPONENT}_{ERROR_TYPE}` 形式）|
-| ADR-002（候補）| LightRAG 採用理由（GraphRAG / Repomix との比較）|
-| ADR-003（候補）| インデックス書き込み経路の排他制御方針（TD-03 対応）|
-| ADR-004（候補）| Embedding プロバイダー戦略（OpenAI only → 将来の拡充）|
+| [ADR-002](./adr/ADR-002-fastmcp-process-proxy.md) | FastMCP process proxy による CodeGraph MCP 統合方式（`NpxStdioTransport` + `mount(namespace="codegraph")`）|
+| ADR-003（候補）| LightRAG 採用理由（GraphRAG / Repomix との比較）|
+| ADR-004（候補）| インデックス書き込み経路の排他制御方針（TD-03 対応）|
+| ADR-005（候補）| Embedding プロバイダー戦略（OpenAI only → 将来の拡充）|
