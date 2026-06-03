@@ -69,6 +69,25 @@ Phase 2 では第 3・第 4 のエンジンを追加実装する。
 +-----------------------------------+
 ```
 
+## MCP Aggregator パターン
+
+aidd-kos の MCP Server は **MCP Aggregator** として実装する。
+
+```text
+AI Agent
+    ↓ MCP stdio（aidd-kos 1本のみ登録）
+MCP Server（FastMCP + Aggregator）
+    ├─ lightrag_* ツール  ← LightRAG embedded サブプロセスを直接実装
+    ├─ codegraph_* ツール ← CodeGraph npx プロセスを proxy
+    └─ kos_status         ← 全エンジンの統合ステータス
+```
+
+**実装方針（FastMCP 2.x）:**
+
+- LightRAG ツール（`lightrag_query` / `lightrag_list`）: FastMCP の `@app.tool()` で直接実装。HTTP で embedded LightRAG を呼ぶ
+- CodeGraph ツール（`codegraph_*`）: FastMCP の process proxy 機能で `npx @colbymchenry/codegraph serve` を束ねる
+- 将来エンジン: 同パターンで追加。AI Agent 側の設定変更は不要
+
 ## レイヤー構成
 
 採用パターン: **レイヤードアーキテクチャ**（Presentation → Application → Domain → Infrastructure）
