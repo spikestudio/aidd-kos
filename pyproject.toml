@@ -24,6 +24,10 @@ packages = ["mcp_server", "aidd_kos"]
 [tool.uv]
 dev-dependencies = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0", "ruff>=0.11.0"]
 
+[tool.pytest.ini_options]
+markers = ["integration: 外部ツール（mise/codegraph/LightRAG）が必要な統合テスト"]
+asyncio_mode = "strict"
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -32,6 +36,7 @@ target-version = "py312"
 select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "RUF"]
 ignore = [
   "E501",
+  "B008",   # Typer の Option/Argument はデフォルト引数内の関数呼び出しが正式パターン
   "RUF001", # 日本語文字列の全角文字は意図的
   "RUF002", # 日本語 docstring の全角括弧は意図的
   "RUF003", # 日本語コメントの全角括弧は意図的

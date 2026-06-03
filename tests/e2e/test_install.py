@@ -7,10 +7,11 @@ import os
 from pathlib import Path
 
 import pytest
-from aidd_kos.cli import app
 from typer.testing import CliRunner
 
-runner = CliRunner(mix_stderr=False)
+from aidd_kos.cli import app
+
+runner = CliRunner()
 
 
 @pytest.fixture()
