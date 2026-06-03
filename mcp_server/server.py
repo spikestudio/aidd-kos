@@ -111,29 +111,45 @@ async def lightrag_list(limit: int = 20) -> str:
 
 
 @mcp.tool()
-async def get_status() -> str:
-    """Check LightRAG server health and index status.
+async def kos_status() -> str:
+    """Check the status of all aidd-kos knowledge engines.
 
-    Deprecated: use kos_status instead (will be replaced in F-03).
+    Use this tool to verify the system is ready before starting a work session,
+    or to understand which tools are available.
+
+    Returns status of LightRAG (ready/unavailable/indexing) and CodeGraph (ready/unavailable),
+    plus the list of available tools.
     """
-    async with httpx.AsyncClient(timeout=5) as client:
-        try:
-            h = await client.get(f"{LIGHTRAG_URL}/health", headers=_headers())
-            health = h.json()
-        except Exception as e:
-            return f"Uninitialized: サーバー未起動 ({e})"
+    from aidd_kos.status import StatusChecker
 
-        try:
-            p = await client.get(f"{LIGHTRAG_URL}/documents/pipeline_status", headers=_headers())
-            pipeline = p.json()
-        except Exception:
-            pipeline = {}
+    checker = StatusChecker()
+    data = checker.check()
 
-        status = health.get("status", "unknown")
-        busy = pipeline.get("busy", False)
-        if busy:
-            return "Indexing: インデックス処理中"
-        return f"Status: {status}"
+    lr = data["lightrag"]
+    cg = data["codegraph"]
+
+    available_tools = [
+        "lightrag_query",
+        "lightrag_list",
+    ]
+    if cg["status"] == "ready":
+        available_tools.extend(
+            [
+                "codegraph_explore",
+                "codegraph_impact",
+                "codegraph_context",
+                "codegraph_callers",
+                "codegraph_callees",
+                "codegraph_trace",
+            ]
+        )
+
+    lines = [
+        f"LightRAG:   {lr['status']}",
+        f"CodeGraph:  {cg['status']} (nodes: {cg.get('node_count', 0)})",
+        f"available_tools: {', '.join(available_tools)}",
+    ]
+    return "\n".join(lines)
 
 
 # ── CodeGraph proxy（ADR-002: NpxStdioTransport + create_proxy + mount）─────────
