@@ -1,7 +1,7 @@
 """aidd-kos MCP サーバー（MCP Aggregator）。
 
 LightRAG ツール（lightrag_*）を FastMCP で直接実装する。
-CodeGraph ツール（codegraph_*）は F-02 で proxy として追加される。
+CodeGraph ツール（codegraph_*）を FastMCP process proxy で統合する（ADR-002）。
 """
 
 from __future__ import annotations
@@ -10,6 +10,8 @@ import os
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.client.transports import NpxStdioTransport
+from fastmcp.server import create_proxy
 
 from aidd_kos.errors import LIGHTRAG_UNAVAILABLE, QUERY_TIMEOUT, emit_error
 
@@ -132,6 +134,21 @@ async def get_status() -> str:
         if busy:
             return "Indexing: インデックス処理中"
         return f"Status: {status}"
+
+
+# ── CodeGraph proxy（ADR-002: NpxStdioTransport + create_proxy + mount）─────────
+# namespace="codegraph" により全ツールが codegraph_* prefix で公開される
+try:
+    _codegraph_proxy = create_proxy(
+        NpxStdioTransport(
+            package="@colbymchenry/codegraph",
+            args=["serve"],
+            env_vars={"PATH": os.environ.get("PATH", "")},
+        )
+    )
+    mcp.mount(_codegraph_proxy, namespace="codegraph")
+except Exception as _e:
+    print(f"[aidd-kos] CodeGraph proxy の登録に失敗しました: {_e}", flush=True)
 
 
 def main() -> None:
