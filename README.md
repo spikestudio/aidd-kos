@@ -1,37 +1,93 @@
 # aidd-kos — Agentic Knowledge OS
 
-LightRAG knowledge graph + MCP server for AI-driven development.
+[![CI](https://github.com/spikestudio/aidd-kos/actions/workflows/ci.yml/badge.svg)](https://github.com/spikestudio/aidd-kos/actions/workflows/ci.yml)
 
-## What it does
+`uvx aidd-kos install` の 1 コマンドで、AI エージェントが開発プロジェクトの
+「コード・設計書・業務文脈」を横断的に理解・検索できるナレッジ OS が即座に稼働する。
+LightRAG・CodeGraph 等の個別ツールを個別にセットアップ・運用する手間はない。
 
-- **Knowledge graph**: Indexes your project documents (Markdown, text) into a LightRAG graph database
-- **MCP server**: Exposes the knowledge graph as MCP tools for Claude Code, Claude Desktop, etc.
+## 概要
 
-## Quick start
+aidd-kos は **MCP Aggregator** として動作し、複数のナレッジエンジンを単一の MCP エンドポイントに束ねます。
 
-### 1. Install
+| ゴール | 指標 |
+|--------|------|
+| AI Agent が自然言語でプロジェクト知識を横断検索できる | P95 応答 < 2秒（1万ドキュメント） |
+| `aidd-kos` 導入から MCP 稼働まで 10 分以内 | `uvx aidd-kos install` → Claude Code 再起動 → MCP 疎通確認 |
+| 単一 MCP エンドポイントで全ナレッジツールにアクセスできる | AI Agent 側の設定変更なしにエンジン追加が完了すること |
+
+### MCP ツール
+
+| ツール | エンジン | 用途 |
+|--------|---------|------|
+| `lightrag_query` | LightRAG | 設計書・ADR・議事録を意味検索（Dual-Level Retrieval） |
+| `lightrag_list` | LightRAG | インデックス済みドキュメントの一覧取得 |
+| `codegraph_context` | CodeGraph | タスク説明からコードコンテキストを構築 |
+| `codegraph_explore` | CodeGraph | シンボル周辺の依存関係を一括取得 |
+| `codegraph_impact` | CodeGraph | 変更影響半径を分析 |
+| `codegraph_trace` | CodeGraph | 2 シンボル間の呼び出しパスを追跡 |
+| `codegraph_callers` | CodeGraph | 呼び出し元の検出 |
+| `codegraph_callees` | CodeGraph | 呼び出し先の検出 |
+| `kos_status` | aidd-kos | 全エンジンの統合ステータス確認 |
+
+### アーキテクチャ
+
+```text
+AI Agent (Claude Code / Cursor 等)
+    ↓ MCP stdio（aidd-kos 1本のみ登録）
+MCP Server（FastMCP + Aggregator）
+    ├─ lightrag_*  ← LightRAG embedded（.lightrag/ は対象プロジェクト内）
+    └─ codegraph_* ← CodeGraph proxy（.codegraph/ は対象プロジェクト内）
+```
+
+## セットアップ
+
+### 前提条件
+
+- Python 3.10+
+- [uv](https://docs.astral.sh/uv/) — Python パッケージマネージャー
+- [mise](https://mise.jdx.dev/) — ツールバージョン管理
+- OpenAI API キー（LightRAG のインデックス構築に必要）
+
+### インストール（Phase 1 完了後）
+
+> **Note:** `aidd-kos install` コマンドは Phase 1 で実装予定です。
+> 現在は以下の手動セットアップを使用してください。
 
 ```bash
+# 対象プロジェクトのルートで実行
+uvx aidd-kos install
+```
+
+上記コマンドは以下を自動実行します:
+
+1. `.lightrag/` と `.codegraph/` を対象プロジェクト内に初期化
+2. `~/.claude/settings.json` に MCP サーバーを登録
+3. `.gitignore` に `.lightrag/` を追記
+
+### 手動セットアップ（現在の方法）
+
+```bash
+# 1. リポジトリをクローン
+git clone https://github.com/spikestudio/aidd-kos.git
+cd aidd-kos
+
+# 2. 依存パッケージをインストール
+mise install
 uv sync
+
+# 3. 環境変数を設定
 cp .env.example .env
-# .env に OPENAI_API_KEY を設定
-```
+# .env を編集して OPENAI_API_KEY を設定
 
-### 2. Start LightRAG server
-
-```bash
+# 4. LightRAG サーバーを起動
 task server:start
-```
 
-### 3. Index your documents
-
-```bash
+# 5. ドキュメントをインデックス
 task index -- /path/to/your/project
 ```
 
-### 4. Connect MCP server to Claude Code
-
-`.claude/settings.json` に追加:
+`~/.claude/settings.json` に以下を追加して Claude Code と接続:
 
 ```json
 {
@@ -48,20 +104,60 @@ task index -- /path/to/your/project
 }
 ```
 
-## MCP tools
+### 環境変数
 
-| Tool | Description |
-|------|-------------|
-| `query_documents` | Search project docs with LightRAG |
-| `get_status` | Check server and index status |
-| `list_documents` | List indexed documents |
+| 変数 | 必須 | 説明 |
+|------|------|------|
+| `OPENAI_API_KEY` | ✅ | OpenAI API キー（インデックス構築・検索に使用） |
+| `LIGHTRAG_API_KEY` | — | LightRAG サーバーの API キー（外部公開時のみ） |
+| `LIGHTRAG_URL` | — | LightRAG API URL（デフォルト: `http://localhost:9621`） |
+| `LLM_BINDING` | — | LLM バインディング（デフォルト: `openai`） |
+| `LLM_MODEL` | — | LLM モデル（デフォルト: `gpt-4o-mini`） |
+| `EMBEDDING_BINDING` | — | Embedding バインディング（デフォルト: `openai`） |
+| `EMBEDDING_MODEL` | — | Embedding モデル（デフォルト: `text-embedding-3-small`） |
 
-## Architecture
+詳細: [docs/playbook/secrets.md](docs/playbook/secrets.md)
 
+## 開発
+
+```bash
+# テスト
+uv run pytest
+
+# Lint / フォーマット
+task lint        # ruff check + format --check
+task lint:fix    # ruff の自動修正
+
+# Git フック（初回のみ）
+lefthook install
 ```
-Claude Code → MCP server → LightRAG REST API → .lightrag/ (graph + vector DB)
-```
 
-## License
+## ドキュメント
 
-MIT
+| ドキュメント | 内容 |
+|------------|------|
+| [docs/PROJECT-CHARTER.md](docs/PROJECT-CHARTER.md) | ビジョン・ゴール・アーキテクチャ方針 |
+| [docs/architecture/baseline.md](docs/architecture/baseline.md) | C4 Container 図・レイヤー構成 |
+| [docs/glossary.md](docs/glossary.md) | 用語集 |
+| [docs/playbook/secrets.md](docs/playbook/secrets.md) | シークレット管理方針 |
+
+## 技術スタック
+
+| カテゴリ | 採用技術 |
+|---------|---------|
+| 言語 | Python 3.12+ |
+| Doc Intelligence | LightRAG (lightrag-hku) 1.5+ |
+| Code Intelligence | CodeGraph (@colbymchenry/codegraph) |
+| MCP フレームワーク | FastMCP 2.0+ |
+| CLI フレームワーク | Typer |
+| パッケージマネージャー | uv |
+| ツールバージョン管理 | mise |
+| CI/CD | GitHub Actions |
+
+## コントリビュート
+
+[CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+
+## ライセンス
+
+MIT — [LICENSE](LICENSE)
