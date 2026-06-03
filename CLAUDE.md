@@ -7,7 +7,7 @@
 
 ## プロジェクト概要
 
-<!-- TODO: プロジェクト名・概要を 1〜2 文で記述してください -->
+aidd-kos（Agentic Knowledge OS）— LightRAG ナレッジグラフ + MCP サーバー。プロジェクトドキュメントをインデックス化し、Claude Code 等の AI エージェントにナレッジグラフ検索ツールを提供する。
 
 ## プロジェクト固有の発見事項
 
@@ -38,12 +38,15 @@ MANDATORY: 使用前に必ず `codegraph status --json` で状態を確認する
 ## ビルド・テストコマンド
 
 ```bash
-# ビルド
-# [コマンド]
+# 依存インストール
+uv sync
 
 # テスト
-# [コマンド]
+uv run pytest
 
-# リント
-# [コマンド]
+# サーバー起動
+task server:start
+
+# ドキュメントインデックス
+task index -- /path/to/project
 ```
