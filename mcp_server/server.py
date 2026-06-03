@@ -7,6 +7,7 @@ CodeGraph ツール（codegraph_*）を FastMCP process proxy で統合する（
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import subprocess
 import sys
@@ -33,7 +34,7 @@ LIGHTRAG_API_KEY = os.environ.get("LIGHTRAG_API_KEY", "")
 _QUERY_TIMEOUT_S = float(os.environ.get("LIGHTRAG_QUERY_TIMEOUT_MS", "5000")) / 1000.0
 _ALLOWED_MODES = frozenset({"hybrid", "mix", "local", "global", "naive"})
 _LIGHTRAG_PORT = int(os.environ.get("LIGHTRAG_PORT", "9621"))
-_LIGHTRAG_STARTUP_TIMEOUT_S = 30
+_LIGHTRAG_HEALTH_CHECK_RETRIES = 30  # S-2: "タイムアウト秒数" ではなく "リトライ回数"
 
 
 @asynccontextmanager
@@ -60,7 +61,7 @@ async def _lifespan(app):
 
     health_url = f"http://127.0.0.1:{_LIGHTRAG_PORT}/health"
     started = False
-    for _ in range(_LIGHTRAG_STARTUP_TIMEOUT_S):
+    for _ in range(_LIGHTRAG_HEALTH_CHECK_RETRIES):
         if proc.poll() is not None:
             break
         try:
@@ -71,11 +72,16 @@ async def _lifespan(app):
             await asyncio.sleep(1)
 
     if not started:
+        # S-3: プロセス即時終了時のみ stderr を読み取り原因診断を remediation に付加
+        stderr_preview = ""
+        if proc.poll() is not None and proc.stderr:
+            with contextlib.suppress(OSError):
+                stderr_preview = proc.stderr.read(512).decode("utf-8", errors="replace").strip()
         proc.terminate()
-        emit_error(
-            LIGHTRAG_STARTUP_FAILED,
-            "LightRAG の起動に失敗しました。ポート競合・依存関係の確認を行ってください。",
-        )
+        remediation = "LightRAG の起動に失敗しました。ポート競合・依存関係の確認を行ってください。"
+        if stderr_preview:
+            remediation += f" (stderr: {stderr_preview})"
+        emit_error(LIGHTRAG_STARTUP_FAILED, remediation)
         raise RuntimeError("LIGHTRAG_STARTUP_FAILED")
 
     print("[aidd-kos] LightRAG 起動完了", flush=True)

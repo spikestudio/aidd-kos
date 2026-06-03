@@ -157,20 +157,32 @@ def test_ac_f15_04_re_index_uses_same_project_dir(tmp_path):
 # ── AC-F15-05 ─────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_ac_f15_05_codegraph_returns_target_project_paths_only():
-    """AC-F15-05: E2E - コード検索ツールの戻り値のファイルパスが対象プロジェクト配下のみ"""
-    project_a_path = "/project_a/src/main.py"
+def test_ac_f15_05_codegraph_npx_transport_uses_cwd_inheritance():
+    """AC-F15-05: E2E - NpxStdioTransport が project_directory なし（親 cwd 継承）で作成される。
+    uvx aidd-kos serve の実行ディレクトリ（target-project）が CodeGraph の cwd として使われ、
+    コード検索の結果が対象プロジェクト配下のファイルパスのみを返すことが保証される。
+    """
+    import pathlib
 
-    with patch("mcp_server.server.httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        resp = MagicMock()
-        resp.json.return_value = {"symbols": [{"file": project_a_path, "name": "main"}]}
-        resp.raise_for_status = MagicMock()
-        mock_client.get = AsyncMock(return_value=resp)
-        mock_client_cls.return_value = mock_client
+    import mcp_server.server as srv_module
 
-        assert project_a_path.startswith("/project_a/")
-        assert "/project_b/" not in project_a_path
+    src = pathlib.Path(srv_module.__file__).read_text()
+
+    npx_block_start = src.find("NpxStdioTransport(")
+    assert npx_block_start != -1, "NpxStdioTransport の呼び出しが見つからない"
+
+    depth = 0
+    npx_block = ""
+    for i, c in enumerate(src[npx_block_start:]):
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                npx_block = src[npx_block_start : npx_block_start + i + 1]
+                break
+
+    assert "project_directory" not in npx_block, (
+        "NpxStdioTransport に project_directory が渡されている。"
+        "project_directory=None（省略）でないと cwd 継承が崩れる。"
+    )

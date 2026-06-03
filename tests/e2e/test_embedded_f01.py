@@ -61,6 +61,7 @@ async def test_ac_f14_01_lightrag_query_available_immediately_after_startup():
             result = await srv.lightrag_query(query="テスト")
 
     assert "LIGHTRAG_UNAVAILABLE" not in result
+    assert result != ""  # S-1: 検索結果が空でないこと（肯定形アサート）
 
 
 # ── AC-F14-02 ─────────────────────────────────────────────────────────────────
