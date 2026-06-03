@@ -72,7 +72,7 @@ async def test_ac_f14_03b_unit_health_check_retries_exactly_30_times_on_timeout(
         async with srv._lifespan(None):
             pass
 
-    assert urlopen_call_count == 30
+    assert urlopen_call_count == srv._LIGHTRAG_HEALTH_CHECK_RETRIES  # S-5: 定数と連動
 
 
 @pytest.mark.asyncio
