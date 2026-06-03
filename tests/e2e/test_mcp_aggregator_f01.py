@@ -109,7 +109,7 @@ async def test_ac_f01_03_lightrag_list_returns_paths(lightrag_doc_list):
     mock_client = AsyncMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.post = AsyncMock(return_value=lightrag_doc_list)
+    mock_client.get = AsyncMock(return_value=lightrag_doc_list)
 
     with patch("mcp_server.server.httpx.AsyncClient", return_value=mock_client):
         result = await srv.lightrag_list()
@@ -123,7 +123,7 @@ async def test_ac_f01_04_lightrag_list_empty(lightrag_empty_list):
     mock_client = AsyncMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.post = AsyncMock(return_value=lightrag_empty_list)
+    mock_client.get = AsyncMock(return_value=lightrag_empty_list)
 
     with patch("mcp_server.server.httpx.AsyncClient", return_value=mock_client):
         result = await srv.lightrag_list()

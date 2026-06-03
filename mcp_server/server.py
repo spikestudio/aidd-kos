@@ -185,14 +185,15 @@ async def lightrag_list(limit: int = 20) -> str:
     """
     try:
         async with httpx.AsyncClient(timeout=_QUERY_TIMEOUT_S) as client:
-            resp = await client.post(
-                f"{LIGHTRAG_URL}/documents/list",
-                json={"limit": min(limit, 100)},
+            # LightRAG v1.5.0 では /documents/list が廃止され GET /documents を使用する
+            resp = await client.get(
+                f"{LIGHTRAG_URL}/documents",
                 headers=_headers(),
             )
             resp.raise_for_status()
             data = resp.json()
             docs = data.get("statuses") or []
+            docs = docs[:limit]
             if not docs:
                 return "インデックス済みドキュメントなし"
             lines = [
