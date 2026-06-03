@@ -194,12 +194,17 @@ async def lightrag_list(limit: int = 20) -> str:
             data = resp.json()
             raw = data.get("statuses") or []
             # LightRAG v1.5.0: statuses が {status: [doc,...]} 形式の辞書になる場合がある
-            docs = [d for group in raw.values() for d in group] if isinstance(raw, dict) else raw
+            # S-1: 値がイテラブルな場合のみフラット化（非イテラブル値の TypeError を防ぐ）
+            if isinstance(raw, dict):
+                docs = [d for group in raw.values() if isinstance(group, list) for d in group]
+            else:
+                docs = raw
             docs = docs[:limit]
             if not docs:
                 return "インデックス済みドキュメントなし"
             lines = [
-                f"- {d.get('content_summary', d.get('file_path', d.get('id', '?')))[:80]}"
+                # C-1: content_summary が None の場合に TypeError が発生するため str() でキャスト
+                f"- {str(d.get('content_summary') or d.get('file_path') or d.get('id') or '?')[:80]}"
                 f" ({d.get('status', '?')})"
                 for d in docs
             ]

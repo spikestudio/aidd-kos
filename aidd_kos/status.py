@@ -55,10 +55,15 @@ class StatusChecker:
         try:
             with urllib.request.urlopen(docs_url, timeout=2) as resp:
                 docs = json.loads(resp.read())
+                # C-2: LightRAG v1.5.0 は {"statuses": {"processed": [...], ...}} を返す
                 if isinstance(docs, list):
                     doc_count = len(docs)
                 elif isinstance(docs, dict):
-                    doc_count = len(docs.get("data", []))
+                    statuses = docs.get("statuses", docs.get("data", []))
+                    if isinstance(statuses, list):
+                        doc_count = len(statuses)
+                    elif isinstance(statuses, dict):
+                        doc_count = sum(len(v) for v in statuses.values() if isinstance(v, list))
         except (urllib.error.URLError, OSError, json.JSONDecodeError):
             pass
 

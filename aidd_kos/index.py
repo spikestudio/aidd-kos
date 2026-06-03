@@ -33,10 +33,9 @@ class IndexOrchestrator:
 
         # LightRAG v1.5.0: /documents/texts にファイル内容を直接送信する
         batches_sent = 0
-        for i in range(0, max(len(files), 1), _BATCH_SIZE):
+        skipped_files = 0
+        for i in range(0, len(files), _BATCH_SIZE):
             batch = files[i : i + _BATCH_SIZE]
-            if not batch:
-                break
 
             texts = []
             sources = []
@@ -46,6 +45,7 @@ class IndexOrchestrator:
                     texts.append(content)
                     sources.append(str(f.relative_to(self.project_dir)))
                 except OSError:
+                    skipped_files += 1
                     continue
 
             if not texts:
@@ -66,5 +66,14 @@ class IndexOrchestrator:
                 emit_error(LIGHTRAG_UNAVAILABLE, "task server:start を実行してください")
                 sys.exit(1)
 
+        # C-3: ファイルが存在するのに1件も送信できなかった場合はエラーを通知する
+        if files and batches_sent == 0:
+            emit_error(
+                LIGHTRAG_UNAVAILABLE,
+                f"全 {len(files)} ファイルの読み取りに失敗しました。ファイルのアクセス権限を確認してください。",
+            )
+            sys.exit(1)
+
         elapsed = time.monotonic() - start
-        return {"file_count": len(files), "elapsed_seconds": elapsed}
+        sent_count = len(files) - skipped_files
+        return {"file_count": sent_count, "elapsed_seconds": elapsed}
