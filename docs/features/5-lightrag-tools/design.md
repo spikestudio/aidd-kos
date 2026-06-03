@@ -44,23 +44,23 @@ docs/spec/mcp-aggregator.md → Feature F-01
 
 ### Spec 追記
 
-- [ ] `specs/e2e/5-lightrag-tools.md` 作成
+- [x] `specs/e2e/5-lightrag-tools.md` 作成
   → 完了条件: 全 AC-F01-01〜06 + QUERY_TIMEOUT シナリオが1件以上対応
 
 ### テスト実装（RED）
 
-- [ ] E2E テスト実装（specs/e2e/5-lightrag-tools.md 全シナリオ）
+- [x] E2E テスト実装（specs/e2e/5-lightrag-tools.md 全シナリオ）
   → 完了条件: pytest が全シナリオで失敗（RED）
 
 ### 実装
 
-- [ ] `query_documents` → `lightrag_query` にリネーム（mode allowlist・タイムアウト 5秒・QUERY_TIMEOUT エラー・stderr 出力）
-- [ ] `list_documents` → `lightrag_list` にリネーム（タイムアウト・stderr 出力）
-- [ ] FastMCP `instructions` を `"Use lightrag_query to search..."` に更新
-- [ ] `QUERY_TIMEOUT` エラーコードを `aidd_kos/errors.py` に追加（ADR-001 準拠）
+- [x] `query_documents` → `lightrag_query` にリネーム（mode allowlist・タイムアウト 5秒・QUERY_TIMEOUT エラー・stderr 出力）
+- [x] `list_documents` → `lightrag_list` にリネーム（タイムアウト・stderr 出力）
+- [x] FastMCP `instructions` を `"Use lightrag_query to search..."` に更新
+- [x] `QUERY_TIMEOUT` エラーコードを `aidd_kos/errors.py` に追加（ADR-001 準拠）
 
 ### 検証
 
-- [ ] 全テスト GREEN
-- [ ] `uv run ruff check . && uv run ruff format --check .` PASS
-- [ ] TD-01・TD-02 が baseline.md で解消済みに更新されていること
+- [x] 全テスト GREEN
+- [x] `uv run ruff check . && uv run ruff format --check .` PASS
+- [x] TD-01・TD-02 が baseline.md で解消済みに更新されていること

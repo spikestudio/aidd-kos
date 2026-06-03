@@ -50,6 +50,9 @@ async def lightrag_query(query: str, mode: str = "hybrid") -> str:
         mode: Search mode — hybrid (recommended), mix, local, global, naive.
     """
     if mode not in _ALLOWED_MODES:
+        from aidd_kos.errors import INVALID_MODE
+
+        emit_error(INVALID_MODE, f"有効な mode: {', '.join(sorted(_ALLOWED_MODES))}")
         return f"INVALID_MODE: '{mode}' は無効です。有効な値: {', '.join(sorted(_ALLOWED_MODES))}"
 
     try:
@@ -89,10 +92,10 @@ async def lightrag_list(limit: int = 20) -> str:
         limit: Maximum number of documents to list.
     """
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=_QUERY_TIMEOUT_S) as client:
             resp = await client.post(
                 f"{LIGHTRAG_URL}/documents/list",
-                json={"limit": limit},
+                json={"limit": min(limit, 100)},
                 headers=_headers(),
             )
             resp.raise_for_status()
@@ -144,8 +147,13 @@ async def kos_status() -> str:
             ]
         )
 
+    # AC-F03-02: インデックス日時・ドキュメント数を含める
+    lr_detail = lr["status"]
+    if lr.get("indexed_at"):
+        lr_detail += f" (indexed: {lr['indexed_at']}, docs: {lr.get('doc_count', 0)})"
+
     lines = [
-        f"LightRAG:   {lr['status']}",
+        f"LightRAG:   {lr_detail}",
         f"CodeGraph:  {cg['status']} (nodes: {cg.get('node_count', 0)})",
         f"available_tools: {', '.join(available_tools)}",
     ]

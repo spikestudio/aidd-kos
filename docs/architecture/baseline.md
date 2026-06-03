@@ -123,8 +123,8 @@ Infrastructure Layer
 
 | ID | 指摘 | 場所 | 対処方針 |
 |----|------|------|---------|
-| TD-01 | `httpx.AsyncClient(timeout=60)` が NFR P95 < 2秒と乖離。タイムアウトが NFR 違反を検知できない | `mcp_server/server.py` L34 | 環境変数 `LIGHTRAG_QUERY_TIMEOUT_MS`（デフォルト 5000ms）でオーバーライド可能にし、タイムアウト時に `{"error": "QUERY_TIMEOUT"}` を返す。Phase 1 完了前に対応 |
-| TD-02 | MCP ツール層でのエラーが stderr に出力されず NFR（3 秒以内 stderr 出力）に不適合 | `mcp_server/server.py` except 節 | MCP ツールのエラーハンドラーで `sys.stderr.write()` によるエラーコード + 対処方法を出力。Phase 1 完了前に対応 |
+| ~~TD-01~~ | ~~httpx タイムアウト NFR 乖離~~ | ✅ 解消済み（Epic #2 F-01）| `LIGHTRAG_QUERY_TIMEOUT_MS` env + `QUERY_TIMEOUT` エラーを実装 |
+| ~~TD-02~~ | ~~MCP エラー時の stderr 出力未実装~~ | ✅ 解消済み（Epic #2 F-01）| `emit_error()` による stderr 出力を全エラーパスに実装 |
 | TD-03 | インデックスの二重書き込み経路（REST API / Python API 直接）による競合リスク。サーバー起動中の Python API 経路はインデックス破損の可能性 | `scripts/index.py` L100-117 | サーバー起動中は Python API 直接経路を禁止（`sys.exit(1)` で明示失敗）し、ADR として設計判断を記録。Phase 2 前に対応 |
 | TD-04 | `aidd-kos` CLI（Typer）が未実装。`pyproject.toml` にエントリポイントなし | `pyproject.toml` | Phase 1 完了条件。`aidd_kos/cli.py` を新規作成（install / index / status）し `pyproject.toml` にエントリポイントを登録する |
 | TD-05 | LightRAG の embedded 起動（サブプロセス管理）が未実装。現状は外部プロセスを手動起動 | `mcp_server/server.py` | Phase 1 完了条件。MCP Server の lifespan フックで LightRAG サブプロセスを起動・ヘルスチェック・終了させる |

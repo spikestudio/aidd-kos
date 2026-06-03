@@ -80,6 +80,7 @@ uvx aidd-kos install
 | `LLM_MODEL` | — | LLM モデル（デフォルト: `gpt-4o-mini`） |
 | `EMBEDDING_BINDING` | — | Embedding バインディング（デフォルト: `openai`） |
 | `EMBEDDING_MODEL` | — | Embedding モデル（デフォルト: `text-embedding-3-small`） |
+| `LIGHTRAG_QUERY_TIMEOUT_MS` | — | lightrag_query のタイムアウト（デフォルト: `5000` ms） |
 
 詳細: [docs/playbook/secrets.md](docs/playbook/secrets.md)
 
