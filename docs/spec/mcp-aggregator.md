@@ -52,7 +52,7 @@ so that I can report the issue with a clear diagnosis.
 
 | ID | 条件 |
 |----|------|
-| AC-F01-05 | LightRAG サーバー未起動時に `{"error": "LIGHTRAG_UNAVAILABLE", "remediation": "task server:start を実行してください"}` を含むレスポンスが返されること |
+| AC-F01-05 | LightRAG サーバー未起動時に `{"error": "LIGHTRAG_UNAVAILABLE", "remediation": "task server:start を実行してください"}` を含むレスポンスが返されること（エラーコード規則: ADR-001）|
 | AC-F01-06 | エラー発生時に 3 秒以内に stderr へエラーコードと対処手順が出力されること |
 
 ---
@@ -103,7 +103,7 @@ so that I can fall back to other knowledge sources.
 
 | ID | 条件 |
 |----|------|
-| AC-F02-06 | CodeGraph インデックス未初期化時に `{"error": "CODEGRAPH_UNAVAILABLE", "remediation": "task codegraph:init を実行してください"}` を含むレスポンスが返されること |
+| AC-F02-06 | CodeGraph インデックス未初期化時に `{"error": "CODEGRAPH_UNAVAILABLE", "remediation": "task codegraph:init を実行してください"}` を含むレスポンスが返されること（エラーコード規則: ADR-001）|
 | AC-F02-07 | エラー発生時に 3 秒以内に stderr へエラーコードと対処手順が出力されること |
 
 ---

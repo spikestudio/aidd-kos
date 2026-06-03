@@ -36,8 +36,8 @@ so that I can fix the issue without wasting time.
 
 | ID | 条件 |
 |----|------|
-| AC-F01-05 | `mise` 未インストール時に 3 秒以内に stderr へインストール手順（URL 付き）を含むエラーが出力されること |
-| AC-F01-06 | `OPENAI_API_KEY` 未設定時に 3 秒以内に stderr へ `.env` 設定方法を含むエラーが出力されること |
+| AC-F01-05 | `mise` 未インストール時に 3 秒以内に stderr へ `MISE_NOT_FOUND` エラーコードとインストール手順（URL 付き）が出力されること（エラーコード規則: ADR-001）|
+| AC-F01-06 | `OPENAI_API_KEY` 未設定時に 3 秒以内に stderr へ `OPENAI_API_KEY_MISSING` エラーコードと `.env` 設定方法が出力されること（エラーコード規則: ADR-001）|
 
 ---
 
@@ -106,7 +106,7 @@ so that I can resolve the issue quickly.
 
 | ID | 条件 |
 |----|------|
-| AC-F02-05 | LightRAG 未起動時に 3 秒以内に stderr へ `LIGHTRAG_UNAVAILABLE` と対処方法が出力されること |
+| AC-F02-05 | LightRAG 未起動時に 3 秒以内に stderr へ `LIGHTRAG_UNAVAILABLE` エラーコードと対処方法が出力されること（エラーコード規則: ADR-001）|
 
 ---
 
