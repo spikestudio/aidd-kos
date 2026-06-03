@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
@@ -32,64 +33,35 @@ def index(
     ),
 ) -> None:
     """プロジェクトのドキュメントを LightRAG にインデックスする"""
-    import urllib.request
+    from aidd_kos.index import IndexOrchestrator
 
     target = path or Path.cwd()
     typer.echo(f"[aidd-kos] インデックス構築中: {target}")
-
-    lightrag_url = "http://localhost:9621"
-    import json
-
-    payload = json.dumps({"input_dir": str(target)}).encode()
-    req = urllib.request.Request(
-        f"{lightrag_url}/documents/scan",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
+    idx = IndexOrchestrator(project_dir=target)
+    result = idx.run()
+    typer.echo(
+        f"[aidd-kos] 完了: {result['file_count']} ファイル ({result['elapsed_seconds']:.1f}s)"
     )
-    try:
-        urllib.request.urlopen(req, timeout=30)
-        typer.echo("[aidd-kos] インデックス完了")
-    except Exception as e:
-        from aidd_kos.errors import LIGHTRAG_UNAVAILABLE, emit_error
-
-        emit_error(LIGHTRAG_UNAVAILABLE, f"task server:start を実行してください: {e}")
-        raise typer.Exit(1) from e
 
 
 @app.command()
-def status() -> None:
+def status(
+    output_json: bool = typer.Option(False, "--json", help="JSON 形式で出力する"),
+) -> None:
     """全ナレッジエンジンの状態を確認する"""
-    import json
-    import subprocess
-    import urllib.request
+    from aidd_kos.status import StatusChecker
 
-    typer.echo("[aidd-kos] ステータス確認中...")
+    checker = StatusChecker()
+    data = checker.check()
 
-    # LightRAG
-    try:
-        urllib.request.urlopen("http://localhost:9621/health", timeout=3)
-        lightrag_status = "ready"
-    except Exception:
-        lightrag_status = "unavailable"
+    if output_json:
+        typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
+        return
 
-    # CodeGraph
-    try:
-        result = subprocess.run(
-            ["npx", "@colbymchenry/codegraph", "status", "--json", "."],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        cg_data = json.loads(result.stdout) if result.returncode == 0 else {}
-        codegraph_status = "ready" if cg_data.get("initialized") else "unavailable"
-        cg_nodes = cg_data.get("nodeCount", 0)
-    except Exception:
-        codegraph_status = "unavailable"
-        cg_nodes = 0
-
-    typer.echo(f"  LightRAG:   {lightrag_status}")
-    typer.echo(f"  CodeGraph:  {codegraph_status} (nodes: {cg_nodes})")
+    lr = data["lightrag"]
+    cg = data["codegraph"]
+    typer.echo(f"  LightRAG:   {lr['status']}")
+    typer.echo(f"  CodeGraph:  {cg['status']} (nodes: {cg.get('node_count', 0)})")
 
 
 @app.command()

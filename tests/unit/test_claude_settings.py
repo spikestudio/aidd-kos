@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+
 from aidd_kos.claude_settings import ClaudeSettings
 
 
