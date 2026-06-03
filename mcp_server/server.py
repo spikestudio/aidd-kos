@@ -6,19 +6,97 @@ CodeGraph ツール（codegraph_*）を FastMCP process proxy で統合する（
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.client.transports import NpxStdioTransport
 from fastmcp.server import create_proxy
 
-from aidd_kos.errors import LIGHTRAG_UNAVAILABLE, QUERY_TIMEOUT, emit_error
+from aidd_kos.errors import (
+    LIGHTRAG_INDEX_NOT_FOUND,
+    LIGHTRAG_STARTUP_FAILED,
+    LIGHTRAG_UNAVAILABLE,
+    QUERY_TIMEOUT,
+    emit_error,
+)
 
 LIGHTRAG_URL = os.environ.get("LIGHTRAG_URL", "http://localhost:9621")
 LIGHTRAG_API_KEY = os.environ.get("LIGHTRAG_API_KEY", "")
 _QUERY_TIMEOUT_S = float(os.environ.get("LIGHTRAG_QUERY_TIMEOUT_MS", "5000")) / 1000.0
 _ALLOWED_MODES = frozenset({"hybrid", "mix", "local", "global", "naive"})
+_LIGHTRAG_PORT = int(os.environ.get("LIGHTRAG_PORT", "9621"))
+_LIGHTRAG_HEALTH_CHECK_RETRIES = 30  # S-2: "タイムアウト秒数" ではなく "リトライ回数"
+
+
+@asynccontextmanager
+async def _lifespan(app):
+    lightrag_dir = Path.cwd() / ".lightrag"
+    lightrag_dir.mkdir(exist_ok=True)
+    print(f"[aidd-kos] LightRAG embedded 起動: {lightrag_dir}", flush=True)
+
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "lightrag.api.lightrag_server",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(_LIGHTRAG_PORT),
+            "--working-dir",
+            str(lightrag_dir),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+
+    health_url = f"http://127.0.0.1:{_LIGHTRAG_PORT}/health"
+    started = False
+    for _ in range(_LIGHTRAG_HEALTH_CHECK_RETRIES):
+        if proc.poll() is not None:
+            break
+        try:
+            urllib.request.urlopen(health_url, timeout=1)
+            started = True
+            break
+        except (urllib.error.URLError, OSError):
+            await asyncio.sleep(1)
+
+    if not started:
+        # S-3: プロセス即時終了時のみ stderr を読み取り原因診断を remediation に付加
+        stderr_preview = ""
+        if proc.poll() is not None and proc.stderr:
+            with contextlib.suppress(OSError):
+                stderr_preview = proc.stderr.read(512).decode("utf-8", errors="replace").strip()
+        proc.terminate()
+        remediation = "LightRAG の起動に失敗しました。ポート競合・依存関係の確認を行ってください。"
+        if stderr_preview:
+            remediation += f" (stderr: {stderr_preview})"
+        emit_error(LIGHTRAG_STARTUP_FAILED, remediation)
+        raise RuntimeError("LIGHTRAG_STARTUP_FAILED")
+
+    print("[aidd-kos] LightRAG 起動完了", flush=True)
+    try:
+        yield
+    finally:
+        print("[aidd-kos] LightRAG 停止中...", flush=True)
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        print("[aidd-kos] LightRAG 停止完了", flush=True)
+
 
 mcp = FastMCP(
     name="aidd-kos",
@@ -28,6 +106,7 @@ mcp = FastMCP(
         "Use lightrag_list to see indexed documents.\n"
         "Use kos_status to check engine health."
     ),
+    lifespan=_lifespan,
 )
 
 
@@ -54,6 +133,19 @@ async def lightrag_query(query: str, mode: str = "hybrid") -> str:
 
         emit_error(INVALID_MODE, f"有効な mode: {', '.join(sorted(_ALLOWED_MODES))}")
         return f"INVALID_MODE: '{mode}' は無効です。有効な値: {', '.join(sorted(_ALLOWED_MODES))}"
+
+    lightrag_dir = Path.cwd() / ".lightrag"
+    index_ready = lightrag_dir.exists() and any(
+        f.suffix in {".json", ".graphml"} for f in lightrag_dir.iterdir() if f.is_file()
+    )
+    if not index_ready:
+        emit_error(
+            LIGHTRAG_INDEX_NOT_FOUND,
+            "aidd-kos index を実行してインデックスを構築してください",
+        )
+        return (
+            "LIGHTRAG_INDEX_NOT_FOUND: インデックスが未構築です。aidd-kos index を実行してください"
+        )
 
     try:
         async with httpx.AsyncClient(timeout=_QUERY_TIMEOUT_S) as client:
