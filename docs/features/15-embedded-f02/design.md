@@ -57,30 +57,18 @@ lightrag_query 呼び出し時
 
 ### Spec 追記
 
-- [ ] `specs/e2e/15-embedded-f02.md` 作成
+- [x] `specs/e2e/15-embedded-f02.md` 作成
   → 完了条件: AC-F15-01〜05 全 5 件がシナリオに対応している
 
 ### テスト実装（RED）
 
-- [ ] E2E テスト `tests/e2e/test_embedded_f02.py` 実装
-  → 完了条件: AC-F15-01〜05 の全シナリオが RED
-
-- [ ] ユニットテスト `tests/unit/test_index_check.py` 実装
-  → 完了条件: LIGHTRAG_INDEX_NOT_FOUND 定数・インデックスチェックロジックが RED
+- [x] E2E テスト `tests/e2e/test_embedded_f02.py` 実装（12 件）
+- [x] ユニットテスト `tests/unit/test_index_check.py` 実装（6 件）
 
 ### 実装・検証
 
-- [ ] `aidd_kos/errors.py` に `LIGHTRAG_INDEX_NOT_FOUND` 追加
-  → 完了条件: `from aidd_kos.errors import LIGHTRAG_INDEX_NOT_FOUND` が成功する
-
-- [ ] `mcp_server/server.py` の `lightrag_query` にインデックスチェック追加
-  → 完了条件: `.lightrag/` に .json/.graphml ファイルがない場合 LIGHTRAG_INDEX_NOT_FOUND を返す
-
-- [ ] 全テスト GREEN 確認（`uv run pytest -q`）
-  → 完了条件: 87 件以上 GREEN
-
-- [ ] リファクタ（ruff check）
-  → 完了条件: exit 0
-
-- [ ] AC カバレッジ確認
-  → 完了条件: AC-F15-01〜05 全 5 件カバー済み
+- [x] `aidd_kos/errors.py` に `LIGHTRAG_INDEX_NOT_FOUND` 追加
+- [x] `mcp_server/server.py` の `lightrag_query` にインデックスチェック追加
+- [x] `tests/e2e/conftest.py` autouse fixture 追加（既存テストとの互換性維持）
+- [x] 全テスト GREEN（99 passed）
+- [x] ruff check PASS
