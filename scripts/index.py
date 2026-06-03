@@ -1,11 +1,13 @@
 """aidd-kos ドキュメントインデックス更新。"""
+
 from __future__ import annotations
+
 import asyncio
+import json
 import os
 import sys
-import json
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -19,7 +21,7 @@ def _load_ignore_patterns() -> list[str]:
     if not IGNORE_FILE.exists():
         return []
     lines = IGNORE_FILE.read_text(encoding="utf-8").splitlines()
-    return [l.strip() for l in lines if l.strip() and not l.startswith("#")]
+    return [line.strip() for line in lines if line.strip() and not line.startswith("#")]
 
 
 def _should_ignore(path: Path, patterns: list[str]) -> bool:
@@ -116,7 +118,7 @@ def main() -> None:
 
     # タイムスタンプ記録
     LIGHTRAG_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
     (LIGHTRAG_DIR / "last_indexed_at").write_text(ts)
     print(f"[aidd-kos] インデックス完了: {ts}")
 

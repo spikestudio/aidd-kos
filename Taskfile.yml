@@ -1,5 +1,6 @@
 version: "3"
 tasks:
+  # ── LightRAG (Doc Intelligence) ─────────────────────────────────────────────
   server:start:
     desc: "LightRAG サーバーを起動する（バックグラウンド）"
     cmds:
@@ -29,3 +30,88 @@ tasks:
     desc: "MCP サーバーを起動する（Claude Code / Claude Desktop 向け）"
     cmds:
       - uv run python -m mcp_server.server
+
+  lightrag:start:
+    desc: "LightRAG サーバーを起動する（server:start のエイリアス）"
+    cmds:
+      - task: server:start
+
+  lightrag:stop:
+    desc: "LightRAG サーバーを停止する（server:stop のエイリアス）"
+    cmds:
+      - task: server:stop
+
+  lightrag:status:
+    desc: "LightRAG の状態を確認する（status のエイリアス）"
+    cmds:
+      - task: status
+
+  lightrag:index:
+    desc: "LightRAG ドキュメントインデックスを更新する"
+    cmds:
+      - task: index -- {{.CLI_ARGS}}
+
+  # ── CodeGraph (Code Intelligence) ───────────────────────────────────────────
+  codegraph:install:
+    desc: "CodeGraph MCP を Claude Code に登録する（要: Claude Code 再起動）"
+    cmds:
+      - npx @colbymchenry/codegraph install --yes
+
+  codegraph:init:
+    desc: "CodeGraph インデックスを初期化・構築する（初回のみ）"
+    cmds:
+      - npx @colbymchenry/codegraph init .
+
+  codegraph:index:
+    desc: "CodeGraph インデックスを再構築する"
+    cmds:
+      - npx @colbymchenry/codegraph index .
+
+  codegraph:status:
+    desc: "CodeGraph インデックスの状態を確認する"
+    cmds:
+      - npx @colbymchenry/codegraph status --json .
+
+  # ── Intelligence（統合） ─────────────────────────────────────────────────────
+  intelligence:start:
+    desc: "LightRAG 起動 + 両インデックスを一括更新する"
+    cmds:
+      - task: lightrag:start
+      - task: intelligence:index
+
+  intelligence:index:
+    desc: "CodeGraph と LightRAG のインデックスを一括更新する"
+    cmds:
+      - task: codegraph:index
+      - task: lightrag:index
+
+  intelligence:status:
+    desc: "CodeGraph と LightRAG の状態を一括表示する"
+    cmds:
+      - task: codegraph:status
+      - task: lightrag:status
+
+  # ── 開発 ─────────────────────────────────────────────────────────────────────
+  lint:
+    desc: "ruff でコードをチェックする"
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+
+  lint:fix:
+    desc: "ruff で自動修正する"
+    cmds:
+      - uv run ruff check --fix .
+      - uv run ruff format .
+
+  test:
+    desc: "pytest でテストを実行する"
+    cmds:
+      - uv run pytest
+
+  setup:
+    desc: "開発環境をセットアップする（lefthook インストール等）"
+    cmds:
+      - mise install
+      - lefthook install
+      - uv sync

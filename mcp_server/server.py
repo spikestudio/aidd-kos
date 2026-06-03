@@ -1,6 +1,9 @@
 """aidd-kos MCP サーバー。LightRAG REST API を MCP ツールとして公開する。"""
+
 from __future__ import annotations
+
 import os
+
 import httpx
 from fastmcp import FastMCP
 
@@ -55,9 +58,7 @@ async def get_status() -> str:
             return f"Uninitialized: サーバー未起動 ({e})"
 
         try:
-            p = await client.get(
-                f"{LIGHTRAG_URL}/documents/pipeline_status", headers=_headers()
-            )
+            p = await client.get(f"{LIGHTRAG_URL}/documents/pipeline_status", headers=_headers())
             pipeline = p.json()
         except Exception:
             pipeline = {}
