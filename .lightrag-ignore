@@ -1,0 +1,6 @@
+# aidd-kos: LightRAG インデックス除外設定
+node_modules/
+.git/
+.lightrag/
+__pycache__/
+*.pyc

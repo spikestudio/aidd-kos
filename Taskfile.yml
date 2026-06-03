@@ -1,0 +1,31 @@
+version: "3"
+tasks:
+  server:start:
+    desc: "LightRAG サーバーを起動する（バックグラウンド）"
+    cmds:
+      - uv run python scripts/server.py
+
+  server:stop:
+    desc: "LightRAG サーバーを停止する"
+    cmds:
+      - uv run python scripts/stop.py
+
+  index:
+    desc: "ドキュメントをインデックス更新する"
+    cmds:
+      - uv run python scripts/index.py {{.CLI_ARGS}}
+
+  status:
+    desc: "サーバー・インデックスの状態を確認する"
+    cmds:
+      - uv run python scripts/status.py
+
+  query:
+    desc: "LightRAG にクエリする（例: task query -- 'ADR の設計方針'）"
+    cmds:
+      - uv run python scripts/query.py {{.CLI_ARGS}}
+
+  mcp:
+    desc: "MCP サーバーを起動する（Claude Code / Claude Desktop 向け）"
+    cmds:
+      - uv run python -m mcp_server.server
