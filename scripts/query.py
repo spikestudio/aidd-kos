@@ -1,5 +1,7 @@
 """コマンドラインから LightRAG にクエリを実行する。"""
+
 from __future__ import annotations
+
 import json
 import sys
 import urllib.request
@@ -33,7 +35,10 @@ def main() -> None:
     mode = mode_args[0].split("=", 1)[1] if mode_args else "hybrid"
 
     if not args:
-        print("使い方: task query -- 'クエリ文字列' [--mode=hybrid|mix|local|global|naive]", file=sys.stderr)
+        print(
+            "使い方: task query -- 'クエリ文字列' [--mode=hybrid|mix|local|global|naive]",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     query_text = " ".join(args)

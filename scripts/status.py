@@ -1,9 +1,11 @@
 """サーバー・インデックスの状態を確認する。"""
+
 from __future__ import annotations
+
 import json
 import sys
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -18,9 +20,7 @@ STALE_THRESHOLD_SECONDS = 3600
 def _check_server() -> tuple[bool, dict]:
     """サーバーの疎通確認とパイプライン状態を返す。"""
     try:
-        with urllib.request.urlopen(
-            f"http://localhost:{LIGHTRAG_PORT}/health", timeout=2
-        ) as resp:
+        with urllib.request.urlopen(f"http://localhost:{LIGHTRAG_PORT}/health", timeout=2) as resp:
             health = json.loads(resp.read())
     except Exception:
         return False, {}
@@ -51,8 +51,8 @@ def _determine_status(server_running: bool, pipeline: dict) -> str:
 
     ts_str = LAST_INDEXED_FILE.read_text().strip()
     try:
-        last_indexed = datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
-        elapsed = (datetime.now(timezone.utc) - last_indexed).total_seconds()
+        last_indexed = datetime.fromisoformat(ts_str).replace(tzinfo=UTC)
+        elapsed = (datetime.now(UTC) - last_indexed).total_seconds()
         if elapsed > STALE_THRESHOLD_SECONDS:
             return "Stale"
     except ValueError:

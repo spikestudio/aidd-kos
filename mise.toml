@@ -1,0 +1,10 @@
+[tools]
+python = "3.12.13"           # mise latest python@3.12（3.13/3.14 freethreaded ビルドは macOS ARM64 で不安定なため）
+uv = "0.11.18"               # mise latest uv
+lefthook = "2.1.9"           # mise latest lefthook
+actionlint = "1.7.12"        # mise latest actionlint
+markdownlint-cli2 = "0.22.1" # mise latest markdownlint-cli2
+taplo = "0.10.0"             # mise latest taplo
+
+[settings]
+experimental = true

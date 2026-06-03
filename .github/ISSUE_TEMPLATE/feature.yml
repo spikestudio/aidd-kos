@@ -1,0 +1,65 @@
+name: Feature
+description: Feature 単位の実装タスク（Epic の子・Story の親）
+title: "[Feature] "
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > このテンプレートは `/aidd-feature-design` スキルが自動生成します。
+
+  - type: textarea
+    id: overview
+    attributes:
+      label: Overview
+      description: この Feature が何をするか（ユーザー視点で 1〜3 行）
+    validations:
+      required: true
+
+  - type: textarea
+    id: stories
+    attributes:
+      label: Stories
+      description: |
+        子 Issue（Story）をタスクリスト形式で列挙する。
+        フォーマット: `- [ ] #Issue番号 タイトル`
+      placeholder: |
+        - [ ] #42 ユーザーがメールアドレスでログインできる
+        - [ ] #43 パスワードリセットができる
+    validations:
+      required: true
+
+  - type: textarea
+    id: related_docs
+    attributes:
+      label: Related Docs
+      description: |
+        関連ドキュメントのリポジトリ相対パスを列挙する。
+        フォーマット: `- 種別: \`パス\``
+      placeholder: |
+        - Spec: `docs/features/auth-login.md`
+        - API:  `mocks/api/openapi.yaml` (`/auth/login`)
+        - Domain: `docs/domain/user.md`
+    validations:
+      required: false
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: 実装前に完了している必要がある Feature / Issue
+      placeholder: |
+        - Requires: #12 ユーザーエンティティ基盤（Feature）
+    validations:
+      required: false
+
+  - type: textarea
+    id: done_when
+    attributes:
+      label: Done When
+      value: |
+        - [ ] 全 Story がクローズ済み
+        - [ ] 全 AC に対応するテストが存在する
+        - [ ] E2E シナリオが pass している
+    validations:
+      required: true

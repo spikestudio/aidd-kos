@@ -1,0 +1,53 @@
+name: Story
+description: Story 単位のユーザーストーリー（Feature の子・AC の親）
+title: "[Story] "
+labels: ["story"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > このテンプレートは `/aidd-feature-design` スキルが自動生成します。
+
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User Story
+      placeholder: |
+        As a 登録済みユーザー
+        I want メールアドレスとパスワードでログインしたい
+        So that アカウントにアクセスできる
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: |
+        フォーマット: `- [ ] AC-F{Feature番号}-NN: 条件`
+        テスト名に同じ AC-ID を付けるとグラフが自動連結される。
+      placeholder: |
+        - [ ] AC-F42-01: 正しい認証情報でログインするとダッシュボードにリダイレクトされる
+        - [ ] AC-F42-02: 誤ったパスワードでは 401 エラーが返る
+        - [ ] AC-F42-03: 5回連続失敗でアカウントが一時ロックされる
+    validations:
+      required: true
+
+  - type: textarea
+    id: related_docs
+    attributes:
+      label: Related Docs
+      description: 関連する API エンドポイント・エンティティ・設計ドキュメントのパス
+      placeholder: |
+        - API: `mocks/api/openapi.yaml` (`POST /auth/login`)
+        - Entity: `docs/domain/user.md#session`
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: 実装上の注意・制約・エッジケース
+    validations:
+      required: false
