@@ -14,7 +14,7 @@
 | # | ゴール | 測定指標 |
 |---|--------|---------|
 | 1 | AI Agent が自然言語でプロジェクト知識を横断検索できる | query P95 応答 < 2秒（1万ドキュメント規模）、関連ドキュメントの適合率 > 80% |
-| 2 | `aidd-kos` 導入から MCP 稼働まで 10 分以内 | 100 ドキュメント以下で `uv sync` → `task server:start` → MCP 疎通確認の所要時間（インデックス構築を除く） |
+| 2 | `aidd-kos` 導入から MCP 稼働まで 10 分以内 | 100 ドキュメント以下で `aidd-kos install` → `aidd-kos start` → MCP 疎通確認の所要時間（インデックス構築を除く） |
 | 3 | AI Agent が単一 MCP サーバー内のツールを自律的に使い分けて開発を推進できる | Agent が 1 タスク内で複数ナレッジツールを組み合わせて呼び出し、目的を達成できること（E2E テストで検証） |
 | 4 | `aidd-kos` のバージョンアップだけで、Agent が使えるナレッジエンジンが増え・改善される | 新バージョン導入後に既存 MCP 接続設定を変えずに新ツールが利用可能になること |
 
@@ -36,7 +36,7 @@
 
 | Phase | 名称 | スコープ概要 | 状態 |
 |-------|------|------------|------|
-| Phase 1 | Core MVP | LightRAG ドキュメント検索 + 単一 MCP サーバー基本実装（query_documents / get_status / list_documents）+ テスト・ドキュメント整備 | 実装完了、MVP 品質担保中 |
+| Phase 1 | Core MVP | LightRAG ドキュメント検索 + 単一 MCP サーバー基本実装（query_documents / get_status / list_documents）+ **`aidd-kos` CLI**（install / start / index / status）+ テスト・ドキュメント整備 | 実装完了、MVP 品質担保中（CLI は未実装） |
 | Phase 2 | Multi-Engine | **第 2・第 3 のナレッジエンジンを aidd-kos に実装**。CodeGraph（コード構造検索）・ADR 特化検索等を企画・実装し、MCP ツールとして公開。Agent が複数エンジンを使い分けて推論できる状態を確立 | 未着手 |
 | Phase 3 | Ecosystem | 外部システム連携エンジン（GitHub Issues / Confluence / Jira 等）・Embedding プロバイダー拡充・精度改善サイクルの確立 | 未着手 |
 
@@ -96,6 +96,7 @@
 | 構成（Phase 2〜） | 単一 MCP サーバーが複数のナレッジエンジンをツールとして公開。どのエンジンを搭載するかは aidd-kos が企画・実装する。ユーザーはバージョンアップするだけで最新のエンジン群を得る |
 | ツール設計原則 | 各 MCP ツールに「いつ使うか（`when_to_use`）」「何を返すか」を明示する。Agent が迷わず選べる記述が品質基準 |
 | エンジン追加方針 | 新エンジンは aidd-kos のリリースとして提供する。ユーザー側の設定変更・追加作業は発生しない |
+| CLI（オペレーター向け） | `aidd-kos <command>` がオペレーター（人間開発者）の唯一の操作窓口。install / start / stop / index / status / update 等を提供。内部で uv / LightRAG 等を呼ぶ |
 | データフロー（Phase 1） | Claude Code → MCP stdio → FastMCP server → LightRAG API → .lightrag/ |
 | データフロー（Phase 2〜） | Claude Code → MCP stdio → FastMCP server → Agent が選んだツール → {LightRAG, CodeGraph, ...} |
 | 外部連携 | Phase 1: OpenAI API のみ。Phase 2〜: Embedding プロバイダー選択肢を aidd-kos が実装・提供 |
@@ -114,7 +115,8 @@
 | CI/CD | GitHub Actions | aidd-fw 標準 |
 | パッケージマネージャー | uv | Python 高速パッケージマネージャー。仮想環境管理含む |
 | ツールバージョン管理 | mise | aidd-fw 標準（固定）|
-| タスクランナー | Task (Taskfile.yml) | 既存プロジェクトで採用済み |
+| CLI フレームワーク | Typer | Python ネイティブ、型ヒントベースで Click より記述量が少ない。`aidd-kos` コマンド実装に使用 |
+| タスクランナー | Task (Taskfile.yml) | 開発者向け内部タスク（CI 等）。ユーザー向け操作は CLI に移管 |
 
 ## 11. 関連ドキュメント
 
