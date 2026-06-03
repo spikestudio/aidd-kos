@@ -194,3 +194,15 @@
 | PCI-DSS | 不採用 | 決済なし |
 | SOC 2 | 不採用 | B2B SaaS でない |
 | ISO 27001 | 不採用 | 任意採用・現時点では採用しない |
+
+## Phase 定義
+
+### Core MVP（Milestone #1）
+
+| 項目 | 内容 |
+|------|------|
+| ゴール | `uvx aidd-kos install` の 1 コマンドで LightRAG + CodeGraph が単一 MCP エンドポイントから稼働し、AI Agent が `lightrag_*` / `codegraph_*` ツールを即座に使える状態 |
+| スコープ | MCP Aggregator 実装・LightRAG embedded 起動・対象プロジェクトへのストレージ配置・aidd-kos CLI（install / index / status）|
+| 成功条件 | `uvx aidd-kos install` → Claude Code 再起動 → `lightrag_query` / `codegraph_explore` が応答する（E2E テスト PASS）|
+| 期限 | 2026-07-31 |
+| 対応 Epic | #2（MCP Aggregator 実装）・#3（Embedded 起動 & ストレージ移動）・#4（aidd-kos CLI & Install フロー）|
