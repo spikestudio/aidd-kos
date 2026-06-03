@@ -1,0 +1,40 @@
+name: Epic
+description: Epic の追跡（Feature の親）
+labels: ["epic"]
+body:
+  - type: input
+    id: epic-doc
+    attributes:
+      label: Epic 仕様書
+      description: ES-NNN-slug.md へのパス
+      placeholder: "docs/requirements/ES-001-user-management.md"
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要
+      description: Epic の概要（詳細は Epic 仕様書を参照）
+    validations:
+      required: true
+  - type: textarea
+    id: features
+    attributes:
+      label: Features
+      description: |
+        子 Issue（Feature）をタスクリスト形式で列挙する。
+        フォーマット: `- [ ] #Issue番号 タイトル`
+      placeholder: |
+        - [ ] #10 ログイン機能
+        - [ ] #11 ユーザー登録機能
+    validations:
+      required: false
+  - type: textarea
+    id: done_when
+    attributes:
+      label: Done When
+      value: |
+        - [ ] 全 Feature がクローズ済み
+        - [ ] epic-complete レビューが PASS している
+    validations:
+      required: true
