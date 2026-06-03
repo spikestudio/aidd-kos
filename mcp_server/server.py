@@ -192,7 +192,8 @@ async def lightrag_list(limit: int = 20) -> str:
             )
             resp.raise_for_status()
             data = resp.json()
-            raw = data.get("statuses") or []
+            # bare list を返す場合に AttributeError を防ぐ（status.py と同様の対応）
+            raw = data if isinstance(data, list) else data.get("statuses") or []
             # LightRAG v1.5.0: statuses が {status: [doc,...]} 形式の辞書になる場合がある
             # S-1: 値がイテラブルな場合のみフラット化（非イテラブル値の TypeError を防ぐ）
             if isinstance(raw, dict):

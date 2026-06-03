@@ -42,6 +42,9 @@ class IndexOrchestrator:
             for f in batch:
                 try:
                     content = f.read_text(encoding="utf-8", errors="replace")
+                    if not content.strip():  # 空ファイルは LightRAG に送らない
+                        skipped_files += 1
+                        continue
                     texts.append(content)
                     sources.append(str(f.relative_to(self.project_dir)))
                 except OSError:
