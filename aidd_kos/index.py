@@ -17,6 +17,7 @@ _INDEX_EXTENSIONS = {".md", ".txt"}
 _BASE_URL = os.environ.get("LIGHTRAG_URL", "http://localhost:9621")
 _LIGHTRAG_TEXTS_URL = _BASE_URL + "/documents/texts"
 _LIGHTRAG_PAGINATED_URL = _BASE_URL + "/documents/paginated"
+_LIGHTRAG_DELETE_URL = _BASE_URL + "/documents/delete_document"
 _BATCH_SIZE = 10
 _PAGE_SIZE = 500
 
@@ -91,9 +92,45 @@ class IndexOrchestrator:
 
         return new_files, modified_files, skip_files
 
+    def _detect_deleted(
+        self,
+        files: list[Path],
+        indexed: dict[str, dict],
+    ) -> dict[str, str]:
+        """indexed にあるが filesystem にないファイルを検出し {rel_path: doc_id} で返す。"""
+        fs_paths = {str(f.relative_to(self.project_dir)) for f in files}
+        return {
+            rel_path: info["id"] for rel_path, info in indexed.items() if rel_path not in fs_paths
+        }
+
+    def _delete_docs(self, deleted: dict[str, str]) -> int:
+        """deleted_docs ({rel_path: doc_id}) を LightRAG から削除し削除件数を返す。
+        deleted が空の場合は API を呼ばずに 0 を返す。
+        """
+        if not deleted:
+            return 0
+        payload = json.dumps(
+            {"doc_ids": list(deleted.values()), "delete_file": False, "delete_llm_cache": False}
+        ).encode()
+        req = urllib.request.Request(
+            _LIGHTRAG_DELETE_URL,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="DELETE",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30):
+                pass
+        except urllib.error.URLError:
+            emit_error(LIGHTRAG_UNAVAILABLE, "task server:start を実行してください")
+            sys.exit(1)
+        return len(deleted)
+
     def run(self) -> dict:
         indexed = self._fetch_indexed_docs()
         files = self.collect_files()
+        deleted_docs = self._detect_deleted(files, indexed)
+        deleted_count = self._delete_docs(deleted_docs)
         new_files, modified_files, skip_files = self._classify_files(files, indexed)
 
         to_process = new_files + modified_files
@@ -149,6 +186,7 @@ class IndexOrchestrator:
             "new_count": len(new_files),
             "updated_count": len(modified_files),
             "skip_count": len(skip_files),
+            "deleted_count": deleted_count,
             "elapsed_seconds": elapsed,
             "file_count": sent_count,  # backward compat
         }

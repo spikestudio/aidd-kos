@@ -62,7 +62,7 @@ def index(
     result = idx.run()
     typer.echo(
         f"[aidd-kos] 差分モード: 追加 {result['new_count']} 件・"
-        f"更新 {result['updated_count']} 件・削除 0 件・"
+        f"更新 {result['updated_count']} 件・削除 {result['deleted_count']} 件・"
         f"スキップ {result['skip_count']} 件 ({result['elapsed_seconds']:.1f}s)"
     )
 
