@@ -205,4 +205,4 @@
 | スコープ | MCP Aggregator 実装・LightRAG embedded 起動・対象プロジェクトへのストレージ配置・aidd-kos CLI（install / index / status）|
 | 成功条件 | `uvx aidd-kos install` → Claude Code 再起動 → `lightrag_query` / `codegraph_explore` が応答する（E2E テスト PASS）|
 | 期限 | 2026-07-31 |
-| 対応 Epic | #4（[1] aidd-kos CLI & Install フロー）・#2（[2] MCP Aggregator 実装）・#3（[3] Embedded 起動 & ストレージ移動）|
+| 対応 Epic | #4（[1] aidd-kos CLI & Install フロー）・#2（[2] MCP Aggregator 実装）・#3（[3] Embedded 起動 & ストレージ移動）・#17（[5] PyPI 公開・リリースパイプライン整備）|
