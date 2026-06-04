@@ -171,6 +171,39 @@
 
 ---
 
+### PyPI（Python Package Index）
+
+**定義**: Python パッケージの公式リポジトリ。`pip install` / `uvx` でパッケージをインストールする際の参照先。
+aidd-kos は PyPI に公開されており `uvx aidd-kos install` でインストール可能。
+
+**用例**: `uvx aidd-kos@latest serve` を実行すると、PyPI から最新バージョンの aidd-kos を取得して MCP サーバーを起動する。
+
+---
+
+### GitHub Release
+
+**定義**: GitHub 上でタグと成果物（リリースノート等）を紐付けて公開する仕組み。aidd-kos では `v*` パターンのタグ付きリリースが PyPI への自動公開のトリガーとなる。
+
+**用例**: `v0.2.0` タグを付けた GitHub Release を作成すると、GitHub Actions が自動的に aidd-kos を PyPI へパブリッシュする。
+
+---
+
+### パブリッシュ
+
+**定義**: aidd-kos のビルド成果物（wheel / sdist）を PyPI に登録し、外部から `pip install` / `uvx` でインストール可能な状態にすること。GitHub Release 作成をトリガーに自動実行される。
+
+**用例**: GitHub Release を作成すると publish ワークフローが起動し、aidd-kos が PyPI にパブリッシュされる。
+
+---
+
+### aidd-kos メンテナー
+
+**定義**: aidd-kos を開発・リリースするスパイクスタジオ開発者。バージョン番号の更新・タグ作成・GitHub Release 作成・リリース手順書（RELEASE.md）の管理を担当する。Charter §3 未定義のプロジェクト固有役割。
+
+**用例**: aidd-kos メンテナーが GitHub Release を作成すると、自動的に PyPI へのパブリッシュが実行される。
+
+---
+
 ### LIGHTRAG_URL
 
 **定義**: LightRAG REST API のエンドポイント URL を指定する環境変数。デフォルト値は `http://localhost:9621`。外部ホストや別ポートを使用する場合にこの変数で上書きする。

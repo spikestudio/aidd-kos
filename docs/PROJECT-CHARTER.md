@@ -67,7 +67,7 @@
 ## 6. 制約事項
 
 - **技術的制約**: LightRAG は OpenAI API（Embedding / LLM）に依存。API コスト・レート制限が制約となる
-- **配布制約**: GitHub Release 経由（PyPI は将来対応）。`uvx` または `pip install git+...` でインストール
+- **配布制約**: PyPI 経由（Phase 1 Core MVP で対応済み）。`uvx aidd-kos@latest` でインストール。GitHub Release をトリガーに自動公開
 - **ビジネス制約**: スパイクスタジオの内部ツールとして開始し、OSS として公開（MIT ライセンス）
 - **リソース制約**: ソロ開発（1名）。Phase 1 MVP を優先
 
