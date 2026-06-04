@@ -105,17 +105,21 @@ async def test_ac_f15_02_returns_index_not_found_when_lightrag_dir_empty(tmp_pat
 # ── AC-F15-03 / F15-04 ───────────────────────────────────────────────────────
 
 
-def test_ac_f15_03_index_scan_uses_project_dir_as_input(tmp_path):
-    """AC-F15-03: E2E - IndexOrchestrator が対象プロジェクトを input_dir として scan API に送る"""
+def test_ac_f15_03_index_sends_files_with_relative_paths(tmp_path):
+    """AC-F15-03: E2E - IndexOrchestrator が対象プロジェクトの .md/.txt ファイルを
+    テキスト API に送信し file_sources が相対パスであること"""
     (tmp_path / "README.md").write_text("# テスト")
-    captured_payload = {}
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "spec.md").write_text("# スペック")
+    captured_sources = []
 
     def fake_urlopen(req, timeout=None):
         import json
 
         body = req.data
         if body:
-            captured_payload.update(json.loads(body))
+            data = json.loads(body)
+            captured_sources.extend(data.get("file_sources", []))
         resp = MagicMock()
         resp.__enter__ = lambda s: s
         resp.__exit__ = MagicMock(return_value=False)
@@ -124,13 +128,16 @@ def test_ac_f15_03_index_scan_uses_project_dir_as_input(tmp_path):
     with patch("aidd_kos.index.urllib.request.urlopen", side_effect=fake_urlopen):
         IndexOrchestrator(project_dir=tmp_path).run()
 
-    assert captured_payload.get("input_dir") == str(tmp_path)
+    assert len(captured_sources) == 2
+    assert all(not s.startswith("/") for s in captured_sources), "file_sources は相対パスであること"
+    assert any("README.md" in s for s in captured_sources)
+    assert any("docs" in s for s in captured_sources)
 
 
-def test_ac_f15_04_re_index_uses_same_project_dir(tmp_path):
-    """AC-F15-04: E2E - 再インデックス実行時も同じ project_dir を input_dir として使用する"""
+def test_ac_f15_04_re_index_uses_same_relative_paths(tmp_path):
+    """AC-F15-04: E2E - 再インデックス実行時も同じ対象プロジェクトの相対パスを使用する"""
     (tmp_path / "README.md").write_text("# テスト")
-    captured_dirs = []
+    all_sources: list[list[str]] = []
 
     def fake_urlopen(req, timeout=None):
         import json
@@ -138,7 +145,9 @@ def test_ac_f15_04_re_index_uses_same_project_dir(tmp_path):
         body = req.data
         if body:
             data = json.loads(body)
-            captured_dirs.append(data.get("input_dir", ""))
+            sources = data.get("file_sources", [])
+            if sources:
+                all_sources.append(sources)
         resp = MagicMock()
         resp.__enter__ = lambda s: s
         resp.__exit__ = MagicMock(return_value=False)
@@ -149,9 +158,8 @@ def test_ac_f15_04_re_index_uses_same_project_dir(tmp_path):
         orchestrator.run()
         orchestrator.run()
 
-    assert len(captured_dirs) == 2
-    assert captured_dirs[0] == str(tmp_path)
-    assert captured_dirs[1] == str(tmp_path)
+    assert len(all_sources) == 2
+    assert all_sources[0] == all_sources[1], "1回目と2回目で同じ file_sources が送られること"
 
 
 # ── AC-F15-05 ─────────────────────────────────────────────────────────────────

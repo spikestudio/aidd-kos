@@ -185,19 +185,29 @@ async def lightrag_list(limit: int = 20) -> str:
     """
     try:
         async with httpx.AsyncClient(timeout=_QUERY_TIMEOUT_S) as client:
-            resp = await client.post(
-                f"{LIGHTRAG_URL}/documents/list",
-                json={"limit": min(limit, 100)},
+            # LightRAG v1.5.0 では /documents/list が廃止され GET /documents を使用する
+            resp = await client.get(
+                f"{LIGHTRAG_URL}/documents",
                 headers=_headers(),
             )
             resp.raise_for_status()
             data = resp.json()
-            docs = data.get("statuses") or []
+            # bare list を返す場合に AttributeError を防ぐ（status.py と同様の対応）
+            raw = data if isinstance(data, list) else data.get("statuses") or []
+            # LightRAG v1.5.0: statuses が {status: [doc,...]} 形式の辞書になる場合がある
+            # S-1: 値がイテラブルな場合のみフラット化（非イテラブル値の TypeError を防ぐ）
+            if isinstance(raw, dict):
+                docs = [d for group in raw.values() if isinstance(group, list) for d in group]
+            else:
+                docs = raw
+            docs = docs[:limit]
             if not docs:
                 return "インデックス済みドキュメントなし"
             lines = [
-                f"- {d.get('file_path', d.get('id', '?'))} ({d.get('status', '?')})"
-                for d in docs[:limit]
+                # C-1: content_summary が None の場合に TypeError が発生するため str() でキャスト
+                f"- {str(d.get('content_summary') or d.get('file_path') or d.get('id') or '?')[:80]}"
+                f" ({d.get('status', '?')})"
+                for d in docs
             ]
             return f"インデックス済みドキュメント ({len(docs)} 件):\n" + "\n".join(lines)
     except (httpx.ConnectError, httpx.HTTPStatusError, Exception) as e:
