@@ -2,13 +2,31 @@
 name = "aidd-kos"
 version = "0.1.0"
 description = "Agentic Knowledge OS — LightRAG knowledge graph + MCP server for AI-driven development"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.10"
+keywords = ["mcp", "ai", "knowledge-graph", "lightrag", "codegraph"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
   "lightrag-hku[api]>=1.5.0",
   "fastmcp>=2.0.0",
   "httpx>=0.27.0",
   "typer>=0.12.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/spikestudio/aidd-kos"
+Source = "https://github.com/spikestudio/aidd-kos"
+Issues = "https://github.com/spikestudio/aidd-kos/issues"
 
 [project.scripts]
 aidd-kos-mcp = "mcp_server.server:main"
@@ -22,7 +40,12 @@ build-backend = "hatchling.build"
 packages = ["mcp_server", "aidd_kos"]
 
 [tool.uv]
-dev-dependencies = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0", "ruff>=0.11.0"]
+dev-dependencies = [
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.23.0",
+  "ruff>=0.11.0",
+  "twine>=6.0.0",
+]
 
 [tool.pytest.ini_options]
 markers = ["integration: 外部ツール（mise/codegraph/LightRAG）が必要な統合テスト"]

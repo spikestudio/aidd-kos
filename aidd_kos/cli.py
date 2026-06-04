@@ -3,11 +3,32 @@
 from __future__ import annotations
 
 import json
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 import typer
 
 app = typer.Typer(help="Agentic Knowledge OS — ナレッジ基盤の構築・管理")
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        v = pkg_version("aidd-kos")
+        typer.echo(f"aidd-kos {v}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main_callback(
+    version: bool | None = typer.Option(
+        None,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="バージョン番号を表示して終了する",
+    ),
+) -> None:
+    """Agentic Knowledge OS — ナレッジ基盤の構築・管理"""
 
 
 @app.command()
