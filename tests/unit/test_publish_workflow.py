@@ -62,3 +62,14 @@ def test_ac_f20_02_unit_workflow_has_oidc_permission():
     """AC-F20-02: Unit - ワークフローに OIDC Trusted Publisher 用の id-token 権限がある"""
     content = _read_workflow()
     assert "id-token" in content, "ワークフローに id-token 権限がない（OIDC 認証に必要）"
+
+
+# ── 失敗ステータス伝播確認（AC-F20-03） ───────────────────────────────────────
+
+
+def test_ac_f20_03_unit_workflow_failure_propagates():
+    """AC-F20-03: Unit - ワークフローに continue-on-error: true が含まれない（失敗ステータスが伝播する）"""
+    content = _read_workflow()
+    assert "continue-on-error: true" not in content, (
+        "continue-on-error: true が設定されているため失敗ステータスが伝播しない"
+    )

@@ -40,12 +40,7 @@ build-backend = "hatchling.build"
 packages = ["mcp_server", "aidd_kos"]
 
 [tool.uv]
-dev-dependencies = [
-  "pytest>=8.0.0",
-  "pytest-asyncio>=0.23.0",
-  "ruff>=0.11.0",
-  "twine>=6.0.0",
-]
+dev-dependencies = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0", "ruff>=0.11.0"]
 
 [tool.pytest.ini_options]
 markers = ["integration: 外部ツール（mise/codegraph/LightRAG）が必要な統合テスト"]
