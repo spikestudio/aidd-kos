@@ -20,7 +20,7 @@ so that I can set up aidd-kos without specifying a git URL.
 
 | ID | Given | When | Then |
 |----|-------|------|------|
-| AC-F[N]-01 | aidd-kos が PyPI に公開されている | オペレーターが `uvx aidd-kos install` を実行したとき | インストールが完了し `aidd-kos --version` が exit code 0 で動作すること |
+| AC-F19-01 | aidd-kos が PyPI に公開されている | オペレーターが `uvx aidd-kos install` を実行したとき | インストールが完了し `aidd-kos --version` が exit code 0 で動作すること |
 
 ---
 
@@ -35,7 +35,7 @@ so that I can keep using the latest features without reinstalling or changing MC
 
 | ID | Given | When | Then |
 |----|-------|------|------|
-| AC-F[N]-02 | aidd-kos の最新バージョンが PyPI に公開されている | オペレーターが `uvx aidd-kos@latest serve` を実行したとき | MCP サーバーが起動し stdio 経由の `initialize` リクエストに対してレスポンスが返ること |
+| AC-F19-02 | aidd-kos の最新バージョンが PyPI に公開されている | オペレーターが `uvx aidd-kos@latest serve` を実行したとき | MCP サーバーが起動し stdio 経由の `initialize` リクエストに対してレスポンスが返ること |
 
 ---
 
@@ -52,8 +52,8 @@ so that I can release reliably without manually running publish commands.
 
 | ID | Given | When | Then |
 |----|-------|------|------|
-| AC-F[M]-01 | `v*` パターンのタグが付いた GitHub Release が作成された | リリースが公開された直後 | GitHub Actions の publish ワークフローが自動起動すること |
-| AC-F[M]-02 | publish ワークフローが正常完了した | `pip index versions aidd-kos` を実行したとき | 新バージョンが PyPI のバージョン一覧に含まれること |
+| AC-F20-01 | `v*` パターンのタグが付いた GitHub Release が作成された | リリースが公開された直後 | GitHub Actions の publish ワークフローが自動起動すること |
+| AC-F20-02 | publish ワークフローが正常完了した | `pip index versions aidd-kos` を実行したとき | 新バージョンが PyPI のバージョン一覧に含まれること |
 
 ---
 
@@ -68,7 +68,7 @@ so that I can detect the failure quickly and take recovery action.
 
 | ID | Given | When | Then |
 |----|-------|------|------|
-| AC-F[M]-03 | PyPI への公開処理が失敗した | publish ワークフローが失敗したとき | GitHub Actions のワークフロー実行ステータスが "failure" となること |
+| AC-F20-03 | PyPI への公開処理が失敗した | publish ワークフローが失敗したとき | GitHub Actions のワークフロー実行ステータスが "failure" となること |
 
 ---
 
@@ -85,4 +85,4 @@ so that I can release consistently without forgetting or making mistakes.
 
 | ID | Given | When | Then |
 |----|-------|------|------|
-| AC-F[L]-01 | リリース手順ドキュメントが `RELEASE.md` として存在する | メンテナーがファイルを参照したとき | バージョン番号の更新・タグ作成・GitHub Release 作成の 3 セクションがそれぞれ含まれていること |
+| AC-F21-01 | リリース手順ドキュメントが `RELEASE.md` として存在する | メンテナーがファイルを参照したとき | バージョン番号の更新・タグ作成・GitHub Release 作成の 3 セクションがそれぞれ含まれていること |
