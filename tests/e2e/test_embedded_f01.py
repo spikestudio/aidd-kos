@@ -14,6 +14,12 @@ import pytest
 import mcp_server.server as srv
 
 
+@pytest.fixture(autouse=True)
+def _set_openai_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """lifespan テストで OPENAI_API_KEY が必須になったため、ダミー値を設定する。"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-for-embedded-tests")
+
+
 def _make_proc_mock(poll_return=None):
     """subprocess.Popen モックを生成する（poll_return=None: プロセス実行中）"""
     mock_proc = MagicMock()

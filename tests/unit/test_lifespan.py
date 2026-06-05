@@ -14,12 +14,32 @@ import pytest
 import mcp_server.server as srv
 from aidd_kos.errors import LIGHTRAG_STARTUP_FAILED
 
+# ── 全テスト共通: OPENAI_API_KEY を設定する ────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _set_openai_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """lifespan テストで OPENAI_API_KEY が必須になったため、ダミー値を設定する。"""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-for-lifespan-tests")
+
+
 # ── 定数 ─────────────────────────────────────────────────────────────────────
 
 
 def test_ac_f14_03a_unit_lightrag_startup_failed_constant_adr001():
     """AC-F14-03a: Unit - LIGHTRAG_STARTUP_FAILED 定数が ADR-001 命名規則に準拠している"""
     assert LIGHTRAG_STARTUP_FAILED == "LIGHTRAG_STARTUP_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_unit_lifespan_raises_when_openai_api_key_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unit - OPENAI_API_KEY 未設定時に起動失敗してエラーを stderr に出力する"""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY_MISSING"):
+        async with srv._lifespan(None):
+            pass
 
 
 def test_unit_lightrag_port_default_is_9621():

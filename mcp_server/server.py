@@ -39,6 +39,12 @@ _LIGHTRAG_HEALTH_CHECK_RETRIES = 30  # S-2: "タイムアウト秒数" ではな
 
 @asynccontextmanager
 async def _lifespan(app):
+    from aidd_kos.errors import OPENAI_API_KEY_MISSING
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        emit_error(OPENAI_API_KEY_MISSING, ".env ファイルに OPENAI_API_KEY を設定してください")
+        raise RuntimeError("OPENAI_API_KEY_MISSING")
+
     lightrag_dir = Path.cwd() / ".lightrag"
     lightrag_dir.mkdir(exist_ok=True)
     print(f"[aidd-kos] LightRAG embedded 起動: {lightrag_dir}", flush=True)
