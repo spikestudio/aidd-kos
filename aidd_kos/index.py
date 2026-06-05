@@ -19,7 +19,7 @@ _LIGHTRAG_TEXTS_URL = _BASE_URL + "/documents/texts"
 _LIGHTRAG_PAGINATED_URL = _BASE_URL + "/documents/paginated"
 _LIGHTRAG_DELETE_URL = _BASE_URL + "/documents/delete_document"
 _BATCH_SIZE = 10
-_PAGE_SIZE = 500
+_PAGE_SIZE = 200  # LightRAG v1.5.0 の page_size 上限
 
 
 class IndexOrchestrator:
