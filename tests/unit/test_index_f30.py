@@ -193,3 +193,38 @@ def test_ac_f30_01_unit_run_deleted_count_zero_when_no_deletions(tmp_path: Path)
         result = idx.run()
 
     assert result["deleted_count"] == 0
+
+
+def test_unit_delete_docs_retries_on_busy(tmp_path: Path) -> None:
+    """Unit - _delete_docs が busy レスポンス時にリトライし、成功後に件数を返す"""
+    idx = IndexOrchestrator(project_dir=tmp_path)
+    responses = [
+        _FakeResp(b'{"status":"busy"}'),
+        _FakeResp(b'{"status":"deletion_started"}'),
+    ]
+
+    with (
+        patch("aidd_kos.index.urllib.request.urlopen", side_effect=responses),
+        patch.object(idx, "_wait_pipeline_idle"),
+    ):
+        count = idx._delete_docs({"gone.md": "doc_gone"})
+
+    assert count == 1
+
+
+def test_unit_delete_docs_warns_after_max_retries(tmp_path: Path) -> None:
+    """Unit - _delete_docs がリトライ上限超過時に 0 を返し stderr に警告を出力する"""
+    idx = IndexOrchestrator(project_dir=tmp_path)
+
+    def _always_busy(req, timeout=None):
+        return _FakeResp(b'{"status":"busy"}')
+
+    with (
+        patch("aidd_kos.index.urllib.request.urlopen", side_effect=_always_busy),
+        patch.object(idx, "_wait_pipeline_idle"),
+        patch("aidd_kos.index.sys.stderr") as mock_stderr,
+    ):
+        count = idx._delete_docs({"gone.md": "doc_gone"}, _max_retries=2)
+
+    assert count == 0
+    assert mock_stderr.write.called

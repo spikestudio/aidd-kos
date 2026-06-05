@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from aidd_kos.config import LIGHTRAG_ENV_DEFAULTS
+
 PROJECT_ROOT = Path(__file__).parent.parent
 LIGHTRAG_DIR = PROJECT_ROOT / ".lightrag"
 PID_FILE = LIGHTRAG_DIR / "server.pid"
@@ -44,13 +46,18 @@ def main() -> None:
         str(LIGHTRAG_DIR),
     ]
 
+    # LightRAG に渡す環境変数: 未設定の場合は OpenAI バインディングをデフォルトとして補完
+    env = os.environ.copy()
+    for k, v in LIGHTRAG_ENV_DEFAULTS.items():
+        env.setdefault(k, v)
+
     log_file = LIGHTRAG_DIR / "server.log"
     with open(log_file, "a") as log_fp:
         proc = subprocess.Popen(
             cmd,
             stdout=log_fp,
             stderr=subprocess.STDOUT,
-            env=os.environ.copy(),
+            env=env,
         )
 
     PID_FILE.write_text(str(proc.pid))

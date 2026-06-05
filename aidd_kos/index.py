@@ -118,28 +118,39 @@ class IndexOrchestrator:
         fs_keys = {self._to_source_key(f) for f in files}
         return {key: info["id"] for key, info in indexed.items() if key not in fs_keys}
 
-    def _delete_docs(self, deleted: dict[str, str]) -> int:
-        """deleted_docs ({rel_path: doc_id}) を LightRAG から削除し削除件数を返す。
+    def _delete_docs(self, deleted: dict[str, str], *, _max_retries: int = 3) -> int:
+        """deleted_docs ({source_key: doc_id}) を LightRAG から削除し削除件数を返す。
         deleted が空の場合は API を呼ばずに 0 を返す。
+        LightRAG がパイプライン busy を返した場合は _wait_pipeline_idle 後にリトライする。
         """
         if not deleted:
             return 0
         payload = json.dumps(
             {"doc_ids": list(deleted.values()), "delete_file": False, "delete_llm_cache": False}
         ).encode()
-        req = urllib.request.Request(
-            _LIGHTRAG_DELETE_URL,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="DELETE",
+        for attempt in range(_max_retries):
+            req = urllib.request.Request(
+                _LIGHTRAG_DELETE_URL,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="DELETE",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read())
+            except urllib.error.URLError:
+                emit_error(LIGHTRAG_UNAVAILABLE, "task server:start を実行してください")
+                sys.exit(1)
+            if data.get("status") != "busy":
+                return len(deleted)
+            if attempt < _max_retries - 1:
+                self._wait_pipeline_idle()
+        print(
+            "[aidd-kos] 警告: LightRAG パイプラインが busy のため削除をスキップしました。"
+            " `aidd-kos index --full` で再構築してください。",
+            file=sys.stderr,
         )
-        try:
-            with urllib.request.urlopen(req, timeout=30):
-                pass
-        except urllib.error.URLError:
-            emit_error(LIGHTRAG_UNAVAILABLE, "task server:start を実行してください")
-            sys.exit(1)
-        return len(deleted)
+        return 0
 
     def _wait_pipeline_idle(self) -> None:
         """LightRAG のパイプラインが idle になるまで待機する（最大 _PIPELINE_WAIT_TIMEOUT 秒）。"""

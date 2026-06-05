@@ -21,10 +21,12 @@ from fastmcp import FastMCP
 from fastmcp.client.transports import NpxStdioTransport
 from fastmcp.server import create_proxy
 
+from aidd_kos.config import LIGHTRAG_ENV_DEFAULTS
 from aidd_kos.errors import (
     LIGHTRAG_INDEX_NOT_FOUND,
     LIGHTRAG_STARTUP_FAILED,
     LIGHTRAG_UNAVAILABLE,
+    OPENAI_API_KEY_MISSING,
     QUERY_TIMEOUT,
     emit_error,
 )
@@ -39,9 +41,18 @@ _LIGHTRAG_HEALTH_CHECK_RETRIES = 30  # S-2: "タイムアウト秒数" ではな
 
 @asynccontextmanager
 async def _lifespan(app):
+    if not os.environ.get("OPENAI_API_KEY"):
+        emit_error(OPENAI_API_KEY_MISSING, ".env ファイルに OPENAI_API_KEY を設定してください")
+        raise RuntimeError("OPENAI_API_KEY_MISSING")
+
     lightrag_dir = Path.cwd() / ".lightrag"
     lightrag_dir.mkdir(exist_ok=True)
     print(f"[aidd-kos] LightRAG embedded 起動: {lightrag_dir}", flush=True)
+
+    # LightRAG に渡す環境変数: 未設定の場合は OpenAI バインディングをデフォルトとして補完
+    _lightrag_env = os.environ.copy()
+    for _k, _v in LIGHTRAG_ENV_DEFAULTS.items():
+        _lightrag_env.setdefault(_k, _v)
 
     proc = subprocess.Popen(
         [
@@ -57,6 +68,7 @@ async def _lifespan(app):
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
+        env=_lightrag_env,
     )
 
     health_url = f"http://127.0.0.1:{_LIGHTRAG_PORT}/health"
