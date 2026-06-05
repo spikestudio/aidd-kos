@@ -33,15 +33,15 @@ class IndexOrchestrator:
         files = []
         for ext in _INDEX_EXTENSIONS:
             files.extend(self.project_dir.rglob(f"*{ext}"))
-        files = [f for f in files if not any(p.startswith(".") for p in f.parts)]
-        # LightRAG v1.5.0 はファイルパスをベースネームにノーマライズするため、
-        # 同じベースネームのファイルが複数ある場合は最近更新のもの 1 件だけ使う
-        seen: dict[str, Path] = {}
-        for f in files:
-            name = f.name
-            if name not in seen or f.stat().st_mtime > seen[name].stat().st_mtime:
-                seen[name] = f
-        return list(seen.values())
+        return [f for f in files if not any(p.startswith(".") for p in f.parts)]
+
+    def _to_source_key(self, f: Path) -> str:
+        """LightRAG に送る file_source キーを生成する。
+        LightRAG v1.5.0 は file_sources をベースネームに正規化するため、
+        相対パスの '/' を '__' に置換してパス情報を保持する。
+        例: docs/spec/install.md → docs__spec__install.md
+        """
+        return str(f.relative_to(self.project_dir)).replace("/", "__")
 
     def _fetch_indexed_docs(self) -> dict[str, dict]:
         """LightRAG の /documents/paginated から全インデックス済みドキュメントを取得する。
@@ -61,8 +61,7 @@ class IndexOrchestrator:
                 with urllib.request.urlopen(req, timeout=30) as resp:
                     data = json.loads(resp.read())
                 for doc in data["documents"]:
-                    # LightRAG v1.5.0 は file_path をベースネームに正規化して格納する
-                    result[Path(doc["file_path"]).name] = {
+                    result[doc["file_path"]] = {
                         "id": doc["id"],
                         "updated_at": doc["updated_at"],
                     }
@@ -93,8 +92,7 @@ class IndexOrchestrator:
         skip_files: list[Path] = []
 
         for f in files:
-            # LightRAG はベースネームを key として格納するため basename で比較する
-            key = f.name
+            key = self._to_source_key(f)
             if key not in indexed:
                 new_files.append(f)
             else:
@@ -114,9 +112,9 @@ class IndexOrchestrator:
         files: list[Path],
         indexed: dict[str, dict],
     ) -> dict[str, str]:
-        """indexed にあるが filesystem にないファイルを検出し {basename: doc_id} で返す。"""
-        fs_names = {f.name for f in files}
-        return {name: info["id"] for name, info in indexed.items() if name not in fs_names}
+        """indexed にあるが filesystem にないファイルを検出し {source_key: doc_id} で返す。"""
+        fs_keys = {self._to_source_key(f) for f in files}
+        return {key: info["id"] for key, info in indexed.items() if key not in fs_keys}
 
     def _delete_docs(self, deleted: dict[str, str]) -> int:
         """deleted_docs ({rel_path: doc_id}) を LightRAG から削除し削除件数を返す。
@@ -170,7 +168,7 @@ class IndexOrchestrator:
                         skipped_read += 1
                         continue
                     texts.append(content)
-                    sources.append(str(f.relative_to(self.project_dir)))
+                    sources.append(self._to_source_key(f))
                 except OSError:
                     skipped_read += 1
                     continue
@@ -237,7 +235,11 @@ class IndexOrchestrator:
         new_files, modified_files, skip_files = self._classify_files(files, indexed)
 
         # 変更ファイルは LightRAG が上書き禁止のため先に DELETE してから再インサートする
-        modified_docs = {f.name: indexed[f.name]["id"] for f in modified_files if f.name in indexed}
+        modified_docs = {
+            self._to_source_key(f): indexed[self._to_source_key(f)]["id"]
+            for f in modified_files
+            if self._to_source_key(f) in indexed
+        }
         deleted_docs = self._detect_deleted(files, indexed)
         docs_to_delete = {**modified_docs, **deleted_docs}
         self._delete_docs(docs_to_delete)
