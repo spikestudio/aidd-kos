@@ -158,7 +158,11 @@ async def lightrag_query(query: str, mode: str = "hybrid") -> str:
             data = resp.json()
             answer = data.get("response", "")
             refs = data.get("references") or []
-            sources = [r["file_path"] for r in refs if isinstance(r, dict) and "file_path" in r]
+            sources = [
+                r["file_path"].replace("___", "/")
+                for r in refs
+                if isinstance(r, dict) and "file_path" in r
+            ]
             if sources:
                 answer += "\n\n参照:\n" + "\n".join(f"- {s}" for s in sources)
             return answer
