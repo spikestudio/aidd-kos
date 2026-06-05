@@ -38,12 +38,17 @@ def install(
         "--project-dir",
         help="対象プロジェクトのディレクトリ（デフォルト: カレントディレクトリ）",
     ),
+    global_install: bool = typer.Option(
+        False,
+        "--global",
+        help="グローバル設定（~/.claude/settings.json）に MCP を登録する（旧動作）",
+    ),
 ) -> None:
     """対象プロジェクトに aidd-kos を全自動セットアップする"""
     from aidd_kos.install import InstallOrchestrator
 
     target = project_dir or Path.cwd()
-    orch = InstallOrchestrator(project_dir=target)
+    orch = InstallOrchestrator(project_dir=target, global_install=global_install)
     orch.run()
 
 

@@ -22,8 +22,9 @@ _GITIGNORE_ENTRIES = [".lightrag/", ".codegraph/"]
 
 
 class InstallOrchestrator:
-    def __init__(self, project_dir: Path) -> None:
+    def __init__(self, project_dir: Path, *, global_install: bool = False) -> None:
         self.project_dir = project_dir.resolve()
+        self.global_install = global_install
 
     def preflight_check(self) -> None:
         """Step 1: 前提条件チェック（最初に実行して 3 秒以内のエラー出力を保証）"""
@@ -83,18 +84,35 @@ class InstallOrchestrator:
             )
 
     def register_mcp(self) -> None:
-        """Step 5: ~/.claude/settings.json に MCP エントリを追加"""
+        """Step 5: MCP エントリを設定ファイルに追加する。
+        global_install=True のとき ~/.claude/settings.json に cwd 付きで書き込む（旧動作）。
+        global_install=False のとき .claude/settings.local.json に cwd なしで書き込む（デフォルト）。
+        """
         home = Path(os.environ.get("HOME", Path.home()))
-        settings_path = home / ".claude" / "settings.json"
-        cs = ClaudeSettings(settings_path)
-        cs.add_mcp_entry(
-            "aidd-kos",
-            {
+        if self.global_install:
+            settings_path = home / ".claude" / "settings.json"
+            entry = {
                 "command": "uvx",
                 "args": ["aidd-kos@latest", "serve"],
                 "cwd": str(self.project_dir),
-            },
-        )
+            }
+        else:
+            settings_path = self.project_dir / ".claude" / "settings.local.json"
+            entry = {
+                "command": "uvx",
+                "args": ["aidd-kos@latest", "serve"],
+            }
+            # グローバル設定に既存エントリがある場合は通知（AC-F40-03）
+            global_path = home / ".claude" / "settings.json"
+            if global_path.exists():
+                existing = ClaudeSettings(global_path)._read()
+                if "aidd-kos" in existing.get("mcpServers", {}):
+                    print(
+                        "[aidd-kos] グローバル設定が検出されました。"
+                        " ~/.claude/settings.json の aidd-kos エントリは手動で削除することを推奨します。"
+                    )
+        cs = ClaudeSettings(settings_path)
+        cs.add_mcp_entry("aidd-kos", entry)
 
     def start_lightrag_and_index(self) -> None:
         """Step 6-7: LightRAG 起動 → ドキュメントインデックス構築"""

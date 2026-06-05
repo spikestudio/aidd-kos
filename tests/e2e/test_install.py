@@ -118,8 +118,10 @@ def test_ac_f01_02_e2e_completion_message(
 def test_ac_f01_03_e2e_mcp_entry_added(
     project_dir: Path, fake_home: Path, env_with_key: None, mock_subprocesses: None
 ) -> None:
-    """AC-F01-03: E2E - ~/.claude/settings.json に aidd-kos エントリが追加される"""
-    runner.invoke(app, ["install", "--project-dir", str(project_dir)])
+    """AC-F01-03: E2E - --global で ~/.claude/settings.json に aidd-kos エントリが追加される
+    (Feature #40: デフォルトは .claude/settings.local.json に変更された)
+    """
+    runner.invoke(app, ["install", "--project-dir", str(project_dir), "--global"])
     claude_settings = fake_home / ".claude" / "settings.json"
     assert claude_settings.exists()
     data = json.loads(claude_settings.read_text())
