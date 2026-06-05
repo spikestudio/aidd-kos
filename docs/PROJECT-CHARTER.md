@@ -76,7 +76,7 @@
 
 - ユーザーが有効な OpenAI API キーを所持していること
 - Python 3.10 以上 + uv がインストール済みであること
-- ポート 9621 が使用可能であること（LightRAG 内部起動用。環境変数 `LIGHTRAG_PORT` で変更可能）
+- ポート 9621 は Epic #38 以降不要（LightRAG in-process 化。ADR-004）
 
 ## 8. リスク
 
