@@ -88,6 +88,9 @@ def test_ac_f29_01_e2e_no_changes_all_skipped(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "差分モード" in result.output
+    assert "追加 0" in result.output
+    assert "更新 0" in result.output
+    assert "削除 0" in result.output
     assert "スキップ" in result.output
 
 

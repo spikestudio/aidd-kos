@@ -60,7 +60,11 @@ class IndexOrchestrator:
             except urllib.error.URLError:
                 emit_error(LIGHTRAG_UNAVAILABLE, "task server:start を実行してください")
                 sys.exit(1)
-            except Exception:
+            except Exception as e:
+                emit_error(
+                    LIGHTRAG_UNAVAILABLE,
+                    f"paginated API のレスポンス解析に失敗しました ({type(e).__name__}）: 全件処理にフォールバックします",
+                )
                 return {}
         return result
 
@@ -190,12 +194,13 @@ class IndexOrchestrator:
             }
 
         indexed = self._fetch_indexed_docs()
-        deleted_docs = self._detect_deleted(files, indexed)
-        deleted_count = self._delete_docs(deleted_docs)
         new_files, modified_files, skip_files = self._classify_files(files, indexed)
 
         to_process = new_files + modified_files
         batches_sent, skipped_read = self._send_files(to_process)
+
+        deleted_docs = self._detect_deleted(files, indexed)
+        deleted_count = self._delete_docs(deleted_docs)
 
         # C-3: 送信対象があるのに1件も送信できなかった場合はエラーを通知する
         if to_process and batches_sent == 0:
