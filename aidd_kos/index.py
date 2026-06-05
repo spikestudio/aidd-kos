@@ -25,7 +25,12 @@ class IndexOrchestrator:
         files = []
         for ext in _INDEX_EXTENSIONS:
             files.extend(self.project_dir.rglob(f"*{ext}"))
-        return [f for f in files if not any(p.startswith(".") for p in f.parts)]
+        # project_dir からの相対パスで判定することで、絶対パスに含まれる . 始まりディレクトリを誤除外しない
+        return [
+            f
+            for f in files
+            if not any(p.startswith(".") for p in f.relative_to(self.project_dir).parts)
+        ]
 
     def _to_source_key(self, f: Path) -> str:
         """LightRAG に送る file_source キーを生成する。

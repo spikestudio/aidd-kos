@@ -58,17 +58,14 @@ async def test_ac_f15_02_unit_no_lightrag_dir_returns_index_not_found(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_ac_f15_02_unit_empty_lightrag_dir_returns_index_not_found(tmp_path):
+async def test_ac_f15_02_unit_empty_lightrag_dir_returns_index_not_found(tmp_path, monkeypatch):
     """AC-F15-02: Unit - .lightrag/ が空ディレクトリの場合 LIGHTRAG_INDEX_NOT_FOUND を返す"""
     (tmp_path / ".lightrag").mkdir()
+    monkeypatch.chdir(tmp_path)  # Path.cwd() が tmp_path を返すようにする
     _set_mock_rag()
     try:
         with patch("sys.stderr", new_callable=StringIO):
-            result = (
-                await srv.lightrag_query.__wrapped__(query="テスト")
-                if hasattr(srv.lightrag_query, "__wrapped__")
-                else await srv.lightrag_query(query="テスト")
-            )
+            result = await srv.lightrag_query(query="テスト")
     finally:
         _clear_rag()
     assert "LIGHTRAG_INDEX_NOT_FOUND" in result or "LIGHTRAG_UNAVAILABLE" in result
