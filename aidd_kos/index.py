@@ -126,20 +126,12 @@ class IndexOrchestrator:
             sys.exit(1)
         return len(deleted)
 
-    def run(self) -> dict:
-        indexed = self._fetch_indexed_docs()
-        files = self.collect_files()
-        deleted_docs = self._detect_deleted(files, indexed)
-        deleted_count = self._delete_docs(deleted_docs)
-        new_files, modified_files, skip_files = self._classify_files(files, indexed)
-
-        to_process = new_files + modified_files
-        start = time.monotonic()
-
+    def _send_files(self, files: list[Path]) -> tuple[int, int]:
+        """files を LightRAG に送信し (batches_sent, skipped_read) を返す。"""
         batches_sent = 0
         skipped_read = 0
-        for i in range(0, len(to_process), _BATCH_SIZE):
-            batch = to_process[i : i + _BATCH_SIZE]
+        for i in range(0, len(files), _BATCH_SIZE):
+            batch = files[i : i + _BATCH_SIZE]
             texts = []
             sources = []
             for f in batch:
@@ -171,6 +163,39 @@ class IndexOrchestrator:
             except urllib.error.URLError:
                 emit_error(LIGHTRAG_UNAVAILABLE, "task server:start を実行してください")
                 sys.exit(1)
+        return batches_sent, skipped_read
+
+    def run(self, *, full: bool = False) -> dict:
+        files = self.collect_files()
+        start = time.monotonic()
+
+        if full:
+            batches_sent, skipped_read = self._send_files(files)
+            if files and batches_sent == 0:
+                emit_error(
+                    LIGHTRAG_UNAVAILABLE,
+                    f"全 {len(files)} ファイルの読み取りに失敗しました。ファイルのアクセス権限を確認してください。",
+                )
+                sys.exit(1)
+            elapsed = time.monotonic() - start
+            full_count = len(files) - skipped_read
+            return {
+                "full_count": full_count,
+                "new_count": full_count,
+                "updated_count": 0,
+                "skip_count": 0,
+                "deleted_count": 0,
+                "elapsed_seconds": elapsed,
+                "file_count": full_count,  # backward compat
+            }
+
+        indexed = self._fetch_indexed_docs()
+        deleted_docs = self._detect_deleted(files, indexed)
+        deleted_count = self._delete_docs(deleted_docs)
+        new_files, modified_files, skip_files = self._classify_files(files, indexed)
+
+        to_process = new_files + modified_files
+        batches_sent, skipped_read = self._send_files(to_process)
 
         # C-3: 送信対象があるのに1件も送信できなかった場合はエラーを通知する
         if to_process and batches_sent == 0:
