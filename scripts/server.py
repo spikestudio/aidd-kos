@@ -44,13 +44,20 @@ def main() -> None:
         str(LIGHTRAG_DIR),
     ]
 
+    # LightRAG に渡す環境変数: 未設定の場合は OpenAI バインディングをデフォルトとして補完
+    env = os.environ.copy()
+    env.setdefault("LLM_BINDING", "openai")
+    env.setdefault("LLM_MODEL", "gpt-4o-mini")
+    env.setdefault("EMBEDDING_BINDING", "openai")
+    env.setdefault("EMBEDDING_MODEL", "text-embedding-3-small")
+
     log_file = LIGHTRAG_DIR / "server.log"
     with open(log_file, "a") as log_fp:
         proc = subprocess.Popen(
             cmd,
             stdout=log_fp,
             stderr=subprocess.STDOUT,
-            env=os.environ.copy(),
+            env=env,
         )
 
     PID_FILE.write_text(str(proc.pid))
