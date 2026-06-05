@@ -52,17 +52,27 @@ def index(
     path: Path | None = typer.Argument(
         None, help="インデックス対象パス（デフォルト: カレントディレクトリ）"
     ),
+    full: bool = typer.Option(False, "--full", help="全件再構築モードで実行する"),
 ) -> None:
     """プロジェクトのドキュメントを LightRAG にインデックスする"""
     from aidd_kos.index import IndexOrchestrator
 
     target = path or Path.cwd()
-    typer.echo(f"[aidd-kos] インデックス構築中: {target}")
     idx = IndexOrchestrator(project_dir=target)
-    result = idx.run()
-    typer.echo(
-        f"[aidd-kos] 完了: {result['file_count']} ファイル ({result['elapsed_seconds']:.1f}s)"
-    )
+    if full:
+        typer.echo(f"[aidd-kos] 全件再構築: {target}")
+        result = idx.run(full=True)
+        typer.echo(
+            f"[aidd-kos] 全件再構築モード: {result['full_count']} 件 ({result['elapsed_seconds']:.1f}s)"
+        )
+    else:
+        typer.echo(f"[aidd-kos] 差分インデックス: {target}")
+        result = idx.run()
+        typer.echo(
+            f"[aidd-kos] 差分モード: 追加 {result['new_count']} 件・"
+            f"更新 {result['updated_count']} 件・削除 {result['deleted_count']} 件・"
+            f"スキップ {result['skip_count']} 件 ({result['elapsed_seconds']:.1f}s)"
+        )
 
 
 @app.command()
