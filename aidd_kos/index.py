@@ -38,10 +38,12 @@ class IndexOrchestrator:
     def _to_source_key(self, f: Path) -> str:
         """LightRAG に送る file_source キーを生成する。
         LightRAG v1.5.0 は file_sources をベースネームに正規化するため、
-        相対パスの '/' を '__' に置換してパス情報を保持する。
-        例: docs/spec/install.md → docs__spec__install.md
+        as_posix() で OS 非依存の相対パスを取得し、'/' を '___'（トリプルアンダースコア）
+        に置換してパス情報を保持する。
+        例: docs/spec/install.md → docs___spec___install.md
+        制約: ファイル名に '___' を含むファイルは非対応。
         """
-        return str(f.relative_to(self.project_dir)).replace("/", "__")
+        return f.relative_to(self.project_dir).as_posix().replace("/", "___")
 
     def _fetch_indexed_docs(self) -> dict[str, dict]:
         """LightRAG の /documents/paginated から全インデックス済みドキュメントを取得する。
@@ -152,6 +154,10 @@ class IndexOrchestrator:
             except Exception:
                 pass
             time.sleep(2)
+        print(
+            "[aidd-kos] 警告: LightRAG パイプライン待機がタイムアウトしました。処理を続行します。",
+            file=sys.stderr,
+        )
 
     def _send_files(self, files: list[Path]) -> tuple[int, int]:
         """files を LightRAG に送信し (batches_sent, skipped_read) を返す。"""
@@ -187,6 +193,15 @@ class IndexOrchestrator:
                 with urllib.request.urlopen(req, timeout=30):
                     pass
                 batches_sent += 1
+            except urllib.error.HTTPError as e:
+                if e.code == 409:
+                    skipped_read += len(texts)  # 既存ドキュメント: スキップ扱い
+                else:
+                    emit_error(
+                        LIGHTRAG_UNAVAILABLE,
+                        f"LightRAG API エラー (HTTP {e.code}): task server:start を実行してください",
+                    )
+                    sys.exit(1)
             except urllib.error.URLError:
                 emit_error(LIGHTRAG_UNAVAILABLE, "task server:start を実行してください")
                 sys.exit(1)
@@ -263,7 +278,7 @@ class IndexOrchestrator:
             "new_count": len(new_files),
             "updated_count": len(modified_files),
             "skip_count": len(skip_files),
-            "deleted_count": len(deleted_docs),
+            "deleted_count": len(deleted_docs),  # ユーザー視点: filesystem から削除されたファイル数
             "elapsed_seconds": elapsed,
             "file_count": sent_count,  # backward compat
         }
