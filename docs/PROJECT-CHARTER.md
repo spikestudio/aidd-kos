@@ -40,8 +40,9 @@
 | Phase | 名称 | スコープ概要 | 状態 |
 |-------|------|------------|------|
 | Phase 1 | Core MVP | **LightRAG（ドキュメント検索）+ CodeGraph（コード検索）を単一 MCP サーバーで公開**。`uvx aidd-kos install` 1 コマンドで対象プロジェクトへの導入完結（.lightrag/ + .codegraph/ 配置・MCP 登録・embedded 起動）。CLI（install / index / status）+ テスト・ドキュメント整備 | 一部実装完了。CLI・embedded 起動・install フロー・CodeGraph MCP 公開は未実装 |
-| Phase 2 | Multi-Engine | Phase 1 の 2 エンジンを基盤に、**第 3・第 4 のナレッジエンジンを追加実装**（ADR 特化検索・外部システム連携等）。Agent が使い分けて推論できる状態をさらに拡充 | 未着手 |
-| Phase 3 | Ecosystem | 外部システム連携エンジン（GitHub Issues / Confluence / Jira 等）・Embedding プロバイダー拡充・精度改善サイクルの確立 | 未着手 |
+| Phase 2 | Operational Excellence | インデックス自動同期・差分更新・lefthook 連携・ステータス可視化・エラーリカバリーなど、**運用を支える機能群を実装**。インストール後の日常利用で人間の管理コストをゼロに近づける | 着手中 |
+| Phase 3 | Multi-Engine | Phase 1 の 2 エンジンを基盤に、**第 3・第 4 のナレッジエンジンを追加実装**（ADR 特化検索・外部システム連携等）。Agent が使い分けて推論できる状態をさらに拡充 | 未着手 |
+| Phase 4 | Ecosystem | 外部システム連携エンジン（GitHub Issues / Confluence / Jira 等）・Embedding プロバイダー拡充・精度改善サイクルの確立 | 未着手 |
 
 ## 4.1 スコープ外
 
@@ -196,6 +197,16 @@
 | ISO 27001 | 不採用 | 任意採用・現時点では採用しない |
 
 ## Phase 定義
+
+### Operational Excellence（Milestone #2）
+
+| 項目 | 内容 |
+|------|------|
+| ゴール | aidd-kos の運用を支える機能群を実装し、インストール後の日常利用で人間の管理コストがゼロに近い状態 |
+| スコープ | インデックス自動同期・差分更新・lefthook 連携・ステータス可視化・エラーリカバリー・運用 CLI 拡充 |
+| 成功条件 | Phase 内の全 Epic が完了し、インストール済みプロジェクトで追加設定なしに運用機能が稼働している |
+| 期限 | 未定 |
+| 対応 Epic | #25（[1] インデックス差分更新）・#26（[2] 自動同期トリガー）・#27（[3] ステータス & エラー可視化）|
 
 ### Core MVP（Milestone #1）
 
