@@ -64,12 +64,12 @@ Epic: #38
 
 | ID | ルール | 根拠 AC |
 |----|--------|---------|
-| BR-MP-01 | `aidd-kos install` のデフォルト書き込み先は `.claude/settings.local.json` | AC-F[F01]-01 |
-| BR-MP-02 | プロジェクトレベル MCP 登録のエントリに `cwd` フィールドを含まない | AC-F[F01]-01 |
-| BR-MP-03 | `--global` オプション指定時のみ `~/.claude/settings.json` に `cwd` 付きで書き込む | AC-F[F01]-04 |
-| BR-MP-04 | 同一プロジェクトへの再 install は MCP エントリを重複させない（冪等）| AC-F[F01]-05 |
-| BR-MP-05 | `install`（`--global` なし）は既存の `~/.claude/settings.json` の `aidd-kos` エントリを変更しない | AC-F[F01]-03 |
-| BR-MP-06 | aidd-kos MCP サーバーは外部ポートを Listen しない（in-process 起動）。Epic #3 の「ポート 9621 別プロセス」から変更 | AC-F[F02]-03・AC-F[F02]-05 |
+| BR-MP-01 | `aidd-kos install` のデフォルト書き込み先は `.claude/settings.local.json` | AC-F40-01 |
+| BR-MP-02 | プロジェクトレベル MCP 登録のエントリに `cwd` フィールドを含まない | AC-F40-01 |
+| BR-MP-03 | `--global` オプション指定時のみ `~/.claude/settings.json` に `cwd` 付きで書き込む | AC-F40-04 |
+| BR-MP-04 | 同一プロジェクトへの再 install は MCP エントリを重複させない（冪等）| AC-F40-05 |
+| BR-MP-05 | `install`（`--global` なし）は既存の `~/.claude/settings.json` の `aidd-kos` エントリを変更しない | AC-F40-03 |
+| BR-MP-06 | aidd-kos MCP サーバーは外部ポートを Listen しない（in-process 起動）。Epic #3 の「ポート 9621 別プロセス」から変更 | AC-F41-03・AC-F41-05 |
 | BR-MP-07 | `.claude/settings.local.json` は `.gitignore` に追記しない。VCS の管理対象としてコミットする | Q-MP-01 解決（2026-06-05）|
 
 ---
