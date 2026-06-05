@@ -80,7 +80,9 @@ def mock_subprocesses(monkeypatch: pytest.MonkeyPatch):
         patch("aidd_kos.install.subprocess.run", side_effect=fake_subprocess_run),
         patch("aidd_kos.install.subprocess.Popen"),
         patch("aidd_kos.install.urllib.request.urlopen", fake_urlopen),
-        patch("aidd_kos.index.urllib.request.urlopen", fake_urlopen),
+        # Feature #41: index.py は in-process LightRAG を使用するため urllib patch 不要
+        # start_lightrag_and_index をモック化してインデックス構築をスキップ
+        patch("aidd_kos.install.InstallOrchestrator.start_lightrag_and_index"),
     ):
         yield
 
