@@ -11,14 +11,14 @@ Epic: #4
 | 概念 | 定義 | 備考 |
 |------|------|------|
 | install コマンド | `uvx aidd-kos install` の 1 コマンドで LightRAG・CodeGraph のインストール〜インデックス初期化〜MCP 登録を全自動化する CLI エントリポイント | オペレーター（人間開発者）が対象プロジェクトのルートで 1 回だけ実行する |
-| 前提チェック | install コマンドが実行前に検証する必須条件の集合。mise インストール済み・OPENAI_API_KEY 設定済み・ポート 9621 使用可能が含まれる | 未充足時は 3 秒以内に stderr へエラーコードと対処方法を出力して終了（AC-F01-05/06） |
+| 前提チェック | install コマンドが実行前に検証する必須条件の集合。mise インストール済み・OPENAI_API_KEY 設定済みが含まれる（Epic #38 以降ポート 9621 は不要） | 未充足時は 3 秒以内に stderr へエラーコードと対処方法を出力して終了（AC-F01-05/06） |
 | MCP 登録 | `~/.claude/settings.json` の `mcpServers` セクションに `aidd-kos` エントリを追記すること。Claude Code 再起動後に AI Agent が MCP ツールを使える状態になる | キーが既存の場合は上書きせず既存値を保持（冪等性保証） |
 | ストレージ初期化 | 対象プロジェクトのルートに `.lightrag/` と `.codegraph/` を作成すること。DB サーバー不要でローカルファイルのみで動作する設計を実現する | 既存ディレクトリが存在する場合は削除・上書きせず保持（AC-F01-10〜12） |
 | .gitignore 自動更新 | install コマンドが対象プロジェクトの `.gitignore` に `.lightrag/` と `.codegraph/` を自動追記すること。既に記載済みの場合は追記しない（冪等性） | インデックスデータが意図せず VCS に混入するのを防ぐ（AC-F01-07〜09） |
 | index コマンド | `aidd-kos index` の 1 コマンドで対象プロジェクトの `.md` / `.txt` ファイルを LightRAG へ再インデックスするCLIコマンド | インデックス構築は OpenAI API を消費する。LightRAG 未起動時はエラーを返す（AC-F02-05） |
 | status コマンド | `aidd-kos status` で LightRAG・CodeGraph の両エンジンの稼働状態を確認する CLI コマンド | エンジン状態は `ready` / `unavailable` / `indexing` の 3 値（AC-F03-01〜02） |
 | 再 install（冪等性） | 既にインストール済みの環境で `aidd-kos install` を再実行した場合、既存のインデックスデータ・MCP 登録を保持し上書きしないこと | データ消失リスクを排除するためデフォルト動作は保持。強制再初期化は明示オプションで提供 |
-| AIDD_KOS_PROJECT_DIR | install コマンドが `~/.claude/settings.json` に書き込む MCP server の環境変数。対象プロジェクトのルートパスを絶対パスで格納する。MCP Server が `.lightrag/` と `.codegraph/` の配置先を決定するために参照する | 対象プロジェクト内にストレージを配置するアーキテクチャ方針の実装キー |
+| AIDD_KOS_PROJECT_DIR | ~~Epic #38 以降は廃止~~。旧: `~/.claude/settings.json` に書き込む MCP server 環境変数。Epic #38 の `.claude/settings.local.json`（cwd なし）では不要になった | ADR-003 参照 |
 | uvx 実行 | `uv tool run` の省略形。aidd-kos を pip install せずに使い捨て実行する PyPA 標準の配布方式。インストール済みかどうかを問わず最新版を取得して実行できる | 配布は GitHub Release 経由。PyPI は将来対応 |
 | mise 前提 | mise（ツールバージョン管理）がインストール済みであることを install の前提条件とする | Python / uv のバージョン管理を mise に委譲する設計方針に起因 |
 
@@ -33,11 +33,11 @@ Epic: #4
 | BR-I03 | `~/.claude/settings.json` へのMCP登録はキーが存在しない場合のみ追記する。既存エントリは上書きしない（冪等性の保証） | AC-F01-10〜12 |
 | BR-I04 | `.gitignore` への追記は `.lightrag/` と `.codegraph/` それぞれについて、既に記載済みの場合は追記しない。重複追記禁止 | AC-F01-07〜09 |
 | BR-I05 | `.lightrag/` と `.codegraph/` が既に存在する場合、install は既存ディレクトリを保持する。--force オプション等の明示的な上書き指示がない限りデータを削除しない | AC-F01-10〜12（データ消失リスク排除） |
-| BR-I06 | `aidd-kos index` は LightRAG サーバーが起動中（`LIGHTRAG_URL` に到達可能）であることを前提とする。未起動時は `LIGHTRAG_UNAVAILABLE` エラーコードと remediation を stderr に出力して終了する | AC-F02-05 |
+| BR-I06 | ~~Epic #38 以降は廃止~~。`aidd-kos index` は LightRAG を in-process で使用するため HTTP サーバー起動は不要。LIGHTRAG_UNAVAILABLE エラーは初期化失敗時のみ発生 | ADR-004 参照 |
 | BR-I07 | `aidd-kos index` がスキャンする対象は `.lightrag-ignore` の除外設定を適用した後の `.md` / `.txt` ファイルに限定する。他の拡張子はスコープ外 | AC-F02-01〜04 |
 | BR-I08 | `aidd-kos status` は LightRAG・CodeGraph の両エンジンの状態を必ず返す。片方のエンジンが unavailable であっても status コマンド自体は成功（exit 0）で終了する | AC-F03-01〜02（MCP Aggregator の BR-06 と整合） |
 | BR-I09 | OPENAI_API_KEY は `.env` ファイルまたは環境変数で管理し、CLI の標準出力・ログに絶対に露出しない | CHARTER §NFR セキュリティ |
-| BR-I10 | LightRAG のデフォルトポートは 9621。`LIGHTRAG_PORT` 環境変数で変更可能とし、install コマンドは `LIGHTRAG_URL` 環境変数を `http://127.0.0.1:{LIGHTRAG_PORT}` として MCP server 設定に書き込む | CHARTER §7 前提条件 |
+| BR-I10 | ~~Epic #38 以降は廃止~~。LightRAG は in-process 起動のためポート不要（ADR-004）。`LIGHTRAG_PORT`・`LIGHTRAG_URL` は MCP server 設定に書き込まない | ADR-004 参照 |
 | BR-I11 | インデックス構築は OpenAI API（Embedding / LLM）を消費する。コスト管理のため `.lightrag-ignore` によるスキャン対象の除外設定を install 時に案内する | CHARTER §8 リスク（OpenAI API コスト超過） |
 
 ---

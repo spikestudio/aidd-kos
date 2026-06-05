@@ -30,8 +30,8 @@ def _make_mock_rag():
 
 
 @pytest.mark.asyncio
-async def test_ac_f14_01_lightrag_query_available_immediately_after_startup():
-    """AC-F14-01: E2E - MCP Server 起動後すぐに lightrag_query が LIGHTRAG_UNAVAILABLE なしに応答する"""
+async def test_ac_f41_01_lightrag_query_available_immediately_after_startup():
+    """AC-F41-01: E2E - MCP Server 起動後すぐに lightrag_query が LIGHTRAG_UNAVAILABLE なしに応答する"""
     mock_rag = _make_mock_rag()
     mock_lightrag_dir = MagicMock()
     mock_lightrag_dir.exists.return_value = True
@@ -55,8 +55,8 @@ async def test_ac_f14_01_lightrag_query_available_immediately_after_startup():
 
 @pytest.mark.asyncio
 @pytest.mark.skip(reason="テスト環境で LightRAG が稼働中の場合があるため手動確認")
-async def test_ac_f14_02_startup_completes_without_port_binding():
-    """AC-F14-02: E2E - 起動が外部ポートなしで完了する（in-process）"""
+async def test_ac_f41_03_startup_completes_without_port_binding():
+    """AC-F41-03: E2E - 起動が外部ポートなしで完了する（ポート 9621 LISTEN なし）"""
     mock_rag = _make_mock_rag()
     port_9621_used = False
     with patch("mcp_server.server.create_lightrag_instance", return_value=mock_rag):
@@ -93,8 +93,8 @@ async def test_ac_f14_03b_startup_fails_on_30s_timeout(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_ac_f14_04a_proc_terminate_called_on_server_stop():
-    """AC-F14-04a: E2E - MCP Server 停止時に finalize_storages が呼ばれる"""
+async def test_ac_f41_finalize_called_on_server_stop():
+    """AC-F41-05: E2E - MCP Server 停止時に finalize_storages が呼ばれ lightrag_server プロセスが存在しない"""
     mock_rag = _make_mock_rag()
     with patch("mcp_server.server.create_lightrag_instance", return_value=mock_rag):
         async with srv._lifespan(None):
@@ -103,7 +103,7 @@ async def test_ac_f14_04a_proc_terminate_called_on_server_stop():
 
 
 @pytest.mark.asyncio
-async def test_ac_f14_04b_query_after_stop_returns_unavailable():
+async def test_ac_f41_query_after_stop_returns_unavailable():
     """AC-F14-04b: E2E - MCP Server 停止後に lightrag_query を呼ぶと LIGHTRAG_UNAVAILABLE が返る"""
     mock_rag = _make_mock_rag()
     with patch("mcp_server.server.create_lightrag_instance", return_value=mock_rag):

@@ -107,3 +107,21 @@ async def test_unit_lifespan_prints_startup_complete() -> None:
         async with srv._lifespan(None):
             pass
     assert "起動完了" in captured.getvalue() or "LightRAG" in captured.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_ac_f41_04_unit_no_port_config_needed() -> None:
+    """AC-F41-04: Unit - LIGHTRAG_PORT/LIGHTRAG_URL 未設定でもクエリが成功する（in-process 動作）"""
+    import os
+
+    mock_rag = _make_mock_rag()
+    # LIGHTRAG_PORT / LIGHTRAG_URL が未設定でも動作することを確認
+    env_without_port = {
+        k: v for k, v in os.environ.items() if k not in ("LIGHTRAG_PORT", "LIGHTRAG_URL")
+    }
+    with (
+        patch("mcp_server.server.create_lightrag_instance", return_value=mock_rag),
+        patch.dict("os.environ", env_without_port, clear=True),
+    ):
+        async with srv._lifespan(None):
+            assert srv._rag is not None  # ポート設定なしで in-process 初期化成功

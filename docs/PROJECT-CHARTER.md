@@ -97,11 +97,11 @@
 
 | 項目 | 方針 |
 |------|------|
-| **MCP Aggregator** | aidd-kos の MCP Server は **MCP Aggregator** として実装する。LightRAG（embedded サブプロセス）と CodeGraph（npx プロセス proxy）のツールを単一の MCP エンドポイントに束ね、AI Agent には `aidd-kos` 1 本だけを登録すれば全ナレッジツールが使える状態にする。将来エンジンが増えても AI Agent 側の設定変更は不要 |
-| 配布・インストール | GitHub Release 経由。対象プロジェクトのルートで `uvx aidd-kos install` の 1 コマンドで完結。~/.claude/settings.json へ MCP 登録・.lightrag/ 初期化・.gitignore 更新をすべて自動実行する |
+| **MCP Aggregator** | aidd-kos の MCP Server は **MCP Aggregator** として実装する。LightRAG（in-process 直接呼び出し・ADR-004）と CodeGraph（npx プロセス proxy）のツールを単一の MCP エンドポイントに束ね、AI Agent には `aidd-kos` 1 本だけを登録すれば全ナレッジツールが使える状態にする。将来エンジンが増えても AI Agent 側の設定変更は不要 |
+| 配布・インストール | GitHub Release 経由。対象プロジェクトのルートで `uvx aidd-kos install` の 1 コマンドで完結。.claude/settings.local.json へ MCP 登録（ADR-003）・.lightrag/ 初期化・.gitignore 更新をすべて自動実行する |
 | ストレージ配置 | `.lightrag/`（ドキュメント知識）・`.codegraph/`（コード知識）はともに**対象プロジェクトのルート**に配置する。aidd-kos 自身のディレクトリには保存しない |
-| LightRAG 起動（embedded） | LightRAG は MCP サーバーのサブプロセスとして起動する。Claude Code が MCP サーバーを起動すると LightRAG も自動起動し、MCP サーバーが停止すると自動終了する。オペレーターはサーバー起動を意識しない |
-| 構成（Phase 1） | `uvx aidd-kos install` → MCP Server（FastMCP）起動 → LightRAG サブプロセス自動起動（localhost:9621）→ .lightrag/（対象プロジェクト内） |
+| LightRAG 起動（in-process）| LightRAG は MCP サーバープロセス内で直接呼び出される（ADR-004）。ポート不使用・サブプロセス不要。Claude Code が MCP サーバーを起動すると LightRAG も自動初期化され、停止時に自動 finalize される。オペレーターはサーバー起動を意識しない |
+| 構成（Phase 2）| `uvx aidd-kos install` → MCP Server（FastMCP）起動 → LightRAG in-process 初期化（ポートなし）→ .lightrag/（対象プロジェクト内）。各プロジェクトに .claude/settings.local.json で独立した MCP 設定 |
 | 構成（Phase 2〜） | 単一 MCP サーバーが複数のナレッジエンジンをツールとして公開。どのエンジンを搭載するかは aidd-kos が企画・実装する。ユーザーはバージョンアップするだけで最新のエンジン群を得る |
 | MCP ツール命名 | エンジン名 prefix を付ける（`lightrag_*`・`codegraph_*`）。Agent はどのエンジンを呼んでいるか認識した上で判断する |
 | ツール設計原則 | 各 MCP ツールに「いつ使うか（`when_to_use`）」「何を返すか」を明示する。Agent が迷わず選べる記述が品質基準 |

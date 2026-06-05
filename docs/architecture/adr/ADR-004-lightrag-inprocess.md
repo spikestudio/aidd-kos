@@ -36,7 +36,7 @@ result = await rag.aquery(query, param=QueryParam(mode="hybrid"))
 LightRAG Python API が HTTP API の全操作をカバーすることを確認済み:
 
 - `ainsert()` → `/documents/texts`
-- `aquery()` → `/query`
+- `aquery_llm()` → `/query`（`references` フィールドを含む完全なレスポンスが必要なため `aquery` ではなく `aquery_llm` を使用）
 - `adelete_by_doc_id()` → `/documents/delete_document`
 - `get_docs_by_status()` → `/documents/paginated`
 
