@@ -21,10 +21,12 @@ from fastmcp import FastMCP
 from fastmcp.client.transports import NpxStdioTransport
 from fastmcp.server import create_proxy
 
+from aidd_kos.config import LIGHTRAG_ENV_DEFAULTS
 from aidd_kos.errors import (
     LIGHTRAG_INDEX_NOT_FOUND,
     LIGHTRAG_STARTUP_FAILED,
     LIGHTRAG_UNAVAILABLE,
+    OPENAI_API_KEY_MISSING,
     QUERY_TIMEOUT,
     emit_error,
 )
@@ -39,8 +41,6 @@ _LIGHTRAG_HEALTH_CHECK_RETRIES = 30  # S-2: "タイムアウト秒数" ではな
 
 @asynccontextmanager
 async def _lifespan(app):
-    from aidd_kos.errors import OPENAI_API_KEY_MISSING
-
     if not os.environ.get("OPENAI_API_KEY"):
         emit_error(OPENAI_API_KEY_MISSING, ".env ファイルに OPENAI_API_KEY を設定してください")
         raise RuntimeError("OPENAI_API_KEY_MISSING")
@@ -51,10 +51,8 @@ async def _lifespan(app):
 
     # LightRAG に渡す環境変数: 未設定の場合は OpenAI バインディングをデフォルトとして補完
     _lightrag_env = os.environ.copy()
-    _lightrag_env.setdefault("LLM_BINDING", "openai")
-    _lightrag_env.setdefault("LLM_MODEL", "gpt-4o-mini")
-    _lightrag_env.setdefault("EMBEDDING_BINDING", "openai")
-    _lightrag_env.setdefault("EMBEDDING_MODEL", "text-embedding-3-small")
+    for _k, _v in LIGHTRAG_ENV_DEFAULTS.items():
+        _lightrag_env.setdefault(_k, _v)
 
     proc = subprocess.Popen(
         [
