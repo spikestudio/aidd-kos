@@ -29,8 +29,8 @@ C4Container
 
     System_Boundary(kos, "aidd-kos（uvx でインストール）") {
         Container(cli, "aidd-kos CLI", "Python / Typer", "install / index / status を提供。uvx aidd-kos install で MCP 登録・ストレージ初期化を自動実行")
-        Container(mcpServer, "MCP Server", "Python / FastMCP", "lightrag_* / codegraph_* ツールを単一エンドポイントで公開。起動時に LightRAG を embedded で自動起動し CodeGraph を proxy")
-        Container(lightrag, "Doc Intelligence Engine", "lightrag-hku", "MCP Server のサブプロセスとして embedded 起動。ドキュメントの Entity/Relation 抽出・Dual-Level 検索")
+        Container(mcpServer, "MCP Server", "Python / FastMCP", "lightrag_* / codegraph_* ツールを単一エンドポイントで公開。LightRAG を in-process で直接呼び出し（Epic #38 ADR-004）、CodeGraph を proxy")
+        Container(lightrag, "Doc Intelligence Engine", "lightrag-hku", "MCP Server 内で in-process 動作（ポートなし）。ドキュメントの Entity/Relation 抽出・Dual-Level 検索")
         Container(codegraph, "Code Intelligence Engine", "CodeGraph (npx)", "コードの AST・呼び出しグラフ・シンボル検索。MCP Server が npx 経由で公開")
     }
 
@@ -42,7 +42,7 @@ C4Container
     Rel(operator, cli, "CLI（1 回のみ）", "uvx aidd-kos install")
     Rel(cli, lightragStore, "初期化", ".lightrag/ を対象プロジェクト内に作成")
     Rel(cli, codegraphStore, "初期化", ".codegraph/ を対象プロジェクト内に作成（npx codegraph init）")
-    Rel(mcpServer, lightrag, "subprocess", "MCP Server 起動時に自動起動・終了時に自動停止（embedded）")
+    Rel(mcpServer, lightrag, "in-process", "MCP Server 内で LightRAG Python ライブラリを直接呼び出し（ADR-004）")
     Rel(mcpServer, codegraph, "npx MCP serve", "CodeGraph MCP サーバーを起動し AI Agent に公開")
     Rel(lightrag, lightragStore, "R/W", "グラフ・ベクトル読み書き（cwd = 対象プロジェクト）")
     Rel(codegraph, codegraphStore, "R/W", "AST インデックス読み書き（cwd = 対象プロジェクト）")

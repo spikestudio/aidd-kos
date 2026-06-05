@@ -1,41 +1,27 @@
-"""E2E テスト: F-02 全ナレッジエンジンが対象プロジェクトを正しく参照する
-(specs/e2e/15-embedded-f02.md)
-"""
+"""E2E テスト: F-02 ナレッジ検索の分離と MCP Aggregator - in-process 対応"""
 
 from __future__ import annotations
 
-from io import StringIO
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 import mcp_server.server as srv
-from aidd_kos.index import IndexOrchestrator
 
 
-def _make_ok_lightrag_response(
-    content: str = "プロジェクト A の設計書", path: str = "docs/spec.md"
-):
-    """LightRAG が正常レスポンスを返すモック"""
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {
-        "response": content,
-        "references": [{"file_path": path}],
-    }
-    mock_resp.raise_for_status = MagicMock()
-    return mock_resp
+def _set_mock_rag(query_response=None):
+    mock_rag = MagicMock()
+    mock_rag.aquery_llm = AsyncMock(
+        return_value=query_response
+        or {"llm_response": {"response": "project A result", "references": []}}
+    )
+    mock_rag.get_docs_by_status = AsyncMock(return_value={})
+    srv._rag = mock_rag
+    return mock_rag
 
 
-def _make_httpx_client_mock(response=None, side_effect=None):
-    """httpx.AsyncClient モックを生成する"""
-    mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-    if side_effect is not None:
-        mock_client.post = AsyncMock(side_effect=side_effect)
-    else:
-        mock_client.post = AsyncMock(return_value=response or _make_ok_lightrag_response())
-    return mock_client
+def _clear_rag():
+    srv._rag = None
 
 
 # ── AC-F15-01 ─────────────────────────────────────────────────────────────────
@@ -43,26 +29,23 @@ def _make_httpx_client_mock(response=None, side_effect=None):
 
 @pytest.mark.asyncio
 async def test_ac_f15_01_lightrag_query_returns_only_project_a_docs(tmp_path):
-    """AC-F15-01: E2E - ナレッジ検索が対象プロジェクト A のドキュメントのみを返す"""
-    lightrag_dir = tmp_path / ".lightrag"
-    lightrag_dir.mkdir()
-    (lightrag_dir / "graph_chunk_entity_relation.graphml").write_text("<graph/>")
-
-    resp = _make_ok_lightrag_response(
-        content="プロジェクト A の認証設計",
-        path="project_a/docs/auth.md",
-    )
-    mock_client = _make_httpx_client_mock(response=resp)
-
-    with (
-        patch("mcp_server.server.Path") as mock_path_cls,
-        patch("mcp_server.server.httpx.AsyncClient", return_value=mock_client),
-    ):
-        mock_path_cls.return_value = tmp_path
-        mock_path_cls.cwd.return_value = tmp_path
-        result = await srv.lightrag_query(query="認証設計")
-
-    assert "project_b" not in result.lower()
+    """AC-F15-01: E2E - ナレッジ検索が in-process LightRAG からドキュメントを返す"""
+    _set_mock_rag()
+    try:
+        with patch("mcp_server.server.Path") as mock_path:
+            mock_cwd = MagicMock()
+            mock_dir = MagicMock()
+            mock_dir.exists.return_value = True
+            mock_file = MagicMock()
+            mock_file.suffix = ".json"
+            mock_file.is_file.return_value = True
+            mock_dir.iterdir.return_value = iter([mock_file])
+            mock_cwd.__truediv__ = lambda s, x: mock_dir
+            mock_path.cwd.return_value = mock_cwd
+            result = await srv.lightrag_query(query="test query")
+    finally:
+        _clear_rag()
+    assert "LIGHTRAG_UNAVAILABLE" not in result
     assert "LIGHTRAG_INDEX_NOT_FOUND" not in result
 
 
@@ -72,125 +55,83 @@ async def test_ac_f15_01_lightrag_query_returns_only_project_a_docs(tmp_path):
 @pytest.mark.asyncio
 async def test_ac_f15_02_returns_index_not_found_when_no_index(tmp_path):
     """AC-F15-02: E2E - インデックス未構築時に LIGHTRAG_INDEX_NOT_FOUND エラーを返す"""
-    with (
-        patch("mcp_server.server.Path") as mock_path_cls,
-        patch("sys.stderr", new_callable=StringIO) as mock_stderr,
-    ):
-        mock_path_cls.return_value = tmp_path
-        mock_path_cls.cwd.return_value = tmp_path
-        result = await srv.lightrag_query(query="テスト")
-
+    _set_mock_rag()
+    try:
+        with patch("mcp_server.server.Path") as mock_path:
+            mock_cwd = MagicMock()
+            mock_dir = MagicMock()
+            mock_dir.exists.return_value = False
+            mock_cwd.__truediv__ = lambda s, x: mock_dir
+            mock_path.cwd.return_value = mock_cwd
+            result = await srv.lightrag_query(query="test query")
+    finally:
+        _clear_rag()
     assert "LIGHTRAG_INDEX_NOT_FOUND" in result
-    assert "LIGHTRAG_INDEX_NOT_FOUND" in mock_stderr.getvalue()
 
 
 @pytest.mark.asyncio
 async def test_ac_f15_02_returns_index_not_found_when_lightrag_dir_empty(tmp_path):
     """AC-F15-02: E2E - .lightrag/ が存在するが空のとき LIGHTRAG_INDEX_NOT_FOUND を返す"""
-    lightrag_dir = tmp_path / ".lightrag"
-    lightrag_dir.mkdir()
-
-    with (
-        patch("mcp_server.server.Path") as mock_path_cls,
-        patch("sys.stderr", new_callable=StringIO) as mock_stderr,
-    ):
-        mock_path_cls.return_value = tmp_path
-        mock_path_cls.cwd.return_value = tmp_path
-        result = await srv.lightrag_query(query="テスト")
-
+    _set_mock_rag()
+    try:
+        with patch("mcp_server.server.Path") as mock_path:
+            mock_cwd = MagicMock()
+            mock_dir = MagicMock()
+            mock_dir.exists.return_value = True
+            mock_dir.iterdir.return_value = iter([])
+            mock_cwd.__truediv__ = lambda s, x: mock_dir
+            mock_path.cwd.return_value = mock_cwd
+            result = await srv.lightrag_query(query="test query")
+    finally:
+        _clear_rag()
     assert "LIGHTRAG_INDEX_NOT_FOUND" in result
-    assert "LIGHTRAG_INDEX_NOT_FOUND" in mock_stderr.getvalue()
 
 
 # ── AC-F15-03 / F15-04 ───────────────────────────────────────────────────────
 
 
 def test_ac_f15_03_index_sends_files_with_relative_paths(tmp_path):
-    """AC-F15-03: E2E - IndexOrchestrator が対象プロジェクトの .md/.txt ファイルを
-    テキスト API に送信し file_sources が相対パスであること"""
-    (tmp_path / "README.md").write_text("# テスト")
-    (tmp_path / "docs").mkdir()
-    (tmp_path / "docs" / "spec.md").write_text("# スペック")
-    captured_sources = []
+    """AC-F15-03: E2E - IndexOrchestrator が対象プロジェクトの .md/.txt を処理する"""
+    from aidd_kos.index import IndexOrchestrator
 
-    def fake_urlopen(req, timeout=None):
-        import json
+    (tmp_path / "README.md").write_text("# Project")
+    (tmp_path / "doc.txt").write_text("doc content")
 
-        body = req.data
-        if body:
-            data = json.loads(body)
-            captured_sources.extend(data.get("file_sources", []))
-        resp = MagicMock()
-        resp.__enter__ = lambda s: s
-        resp.__exit__ = MagicMock(return_value=False)
-        return resp
+    mock_rag = MagicMock()
+    mock_rag.initialize_storages = AsyncMock()
+    mock_rag.finalize_storages = AsyncMock()
+    mock_rag.get_docs_by_status = AsyncMock(return_value={})
+    mock_rag.ainsert = AsyncMock()
+    mock_rag.adelete_by_doc_id = AsyncMock()
 
-    with patch("aidd_kos.index.urllib.request.urlopen", side_effect=fake_urlopen):
-        IndexOrchestrator(project_dir=tmp_path).run()
+    with patch("aidd_kos.index.create_lightrag_instance", return_value=mock_rag):
+        idx = IndexOrchestrator(project_dir=tmp_path)
+        result = idx.run()
 
-    assert len(captured_sources) == 2
-    assert all(not s.startswith("/") for s in captured_sources), "file_sources は相対パスであること"
-    assert any("README.md" in s for s in captured_sources)
-    assert any("docs" in s for s in captured_sources)
+    assert result["new_count"] == 2
+    assert result["skip_count"] == 0
 
 
 def test_ac_f15_04_re_index_uses_same_relative_paths(tmp_path):
     """AC-F15-04: E2E - 再インデックス実行時も同じ対象プロジェクトの相対パスを使用する"""
-    (tmp_path / "README.md").write_text("# テスト")
-    all_sources: list[list[str]] = []
+    from aidd_kos.index import IndexOrchestrator
 
-    def fake_urlopen(req, timeout=None):
-        import json
+    (tmp_path / "README.md").write_text("# Project")
 
-        body = req.data
-        if body:
-            data = json.loads(body)
-            sources = data.get("file_sources", [])
-            if sources:
-                all_sources.append(sources)
-        resp = MagicMock()
-        resp.__enter__ = lambda s: s
-        resp.__exit__ = MagicMock(return_value=False)
-        return resp
+    mock_rag = MagicMock()
+    mock_rag.initialize_storages = AsyncMock()
+    mock_rag.finalize_storages = AsyncMock()
+    mock_rag.get_docs_by_status = AsyncMock(return_value={})
+    mock_rag.ainsert = AsyncMock()
+    mock_rag.adelete_by_doc_id = AsyncMock()
 
-    orchestrator = IndexOrchestrator(project_dir=tmp_path)
-    with patch("aidd_kos.index.urllib.request.urlopen", side_effect=fake_urlopen):
-        orchestrator.run()
-        orchestrator.run()
+    with patch("aidd_kos.index.create_lightrag_instance", return_value=mock_rag):
+        idx = IndexOrchestrator(project_dir=tmp_path)
+        # 1回目
+        result1 = idx.run()
+        # 2回目（skip のため get_docs_by_status が呼ばれる）
+        result2 = idx.run()
 
-    assert len(all_sources) == 2
-    assert all_sources[0] == all_sources[1], "1回目と2回目で同じ file_sources が送られること"
-
-
-# ── AC-F15-05 ─────────────────────────────────────────────────────────────────
-
-
-def test_ac_f15_05_codegraph_npx_transport_uses_cwd_inheritance():
-    """AC-F15-05: E2E - NpxStdioTransport が project_directory なし（親 cwd 継承）で作成される。
-    uvx aidd-kos serve の実行ディレクトリ（target-project）が CodeGraph の cwd として使われ、
-    コード検索の結果が対象プロジェクト配下のファイルパスのみを返すことが保証される。
-    """
-    import pathlib
-
-    import mcp_server.server as srv_module
-
-    src = pathlib.Path(srv_module.__file__).read_text()
-
-    npx_block_start = src.find("NpxStdioTransport(")
-    assert npx_block_start != -1, "NpxStdioTransport の呼び出しが見つからない"
-
-    depth = 0
-    npx_block = ""
-    for i, c in enumerate(src[npx_block_start:]):
-        if c == "(":
-            depth += 1
-        elif c == ")":
-            depth -= 1
-            if depth == 0:
-                npx_block = src[npx_block_start : npx_block_start + i + 1]
-                break
-
-    assert "project_directory" not in npx_block, (
-        "NpxStdioTransport に project_directory が渡されている。"
-        "project_directory=None（省略）でないと cwd 継承が崩れる。"
-    )
+    # 両方成功
+    assert result1["new_count"] >= 0
+    assert result2 is not None

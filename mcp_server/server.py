@@ -1,27 +1,21 @@
 """aidd-kos MCP サーバー（MCP Aggregator）。
 
-LightRAG ツール（lightrag_*）を FastMCP で直接実装する。
+LightRAG ツール（lightrag_*）を FastMCP で in-process 呼び出しとして実装する（ADR-004）。
 CodeGraph ツール（codegraph_*）を FastMCP process proxy で統合する（ADR-002）。
 """
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import os
-import subprocess
-import sys
-import urllib.error
-import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import httpx
 from fastmcp import FastMCP
 from fastmcp.client.transports import NpxStdioTransport
 from fastmcp.server import create_proxy
 
-from aidd_kos.config import LIGHTRAG_ENV_DEFAULTS
+from aidd_kos.config import create_lightrag_instance
 from aidd_kos.errors import (
     LIGHTRAG_INDEX_NOT_FOUND,
     LIGHTRAG_STARTUP_FAILED,
@@ -31,82 +25,41 @@ from aidd_kos.errors import (
     emit_error,
 )
 
-LIGHTRAG_URL = os.environ.get("LIGHTRAG_URL", "http://localhost:9621")
-LIGHTRAG_API_KEY = os.environ.get("LIGHTRAG_API_KEY", "")
 _QUERY_TIMEOUT_S = float(os.environ.get("LIGHTRAG_QUERY_TIMEOUT_MS", "5000")) / 1000.0
 _ALLOWED_MODES = frozenset({"hybrid", "mix", "local", "global", "naive"})
-_LIGHTRAG_PORT = int(os.environ.get("LIGHTRAG_PORT", "9621"))
-_LIGHTRAG_HEALTH_CHECK_RETRIES = 30  # S-2: "タイムアウト秒数" ではなく "リトライ回数"
+
+# in-process LightRAG インスタンス（lifespan で初期化・finalize される）
+_rag = None
 
 
 @asynccontextmanager
 async def _lifespan(app):
+    global _rag
+
     if not os.environ.get("OPENAI_API_KEY"):
         emit_error(OPENAI_API_KEY_MISSING, ".env ファイルに OPENAI_API_KEY を設定してください")
         raise RuntimeError("OPENAI_API_KEY_MISSING")
 
     lightrag_dir = Path.cwd() / ".lightrag"
     lightrag_dir.mkdir(exist_ok=True)
-    print(f"[aidd-kos] LightRAG embedded 起動: {lightrag_dir}", flush=True)
+    print(f"[aidd-kos] LightRAG in-process 起動: {lightrag_dir}", flush=True)
 
-    # LightRAG に渡す環境変数: 未設定の場合は OpenAI バインディングをデフォルトとして補完
-    _lightrag_env = os.environ.copy()
-    for _k, _v in LIGHTRAG_ENV_DEFAULTS.items():
-        _lightrag_env.setdefault(_k, _v)
+    try:
+        _rag = create_lightrag_instance(str(lightrag_dir))
+        await _rag.initialize_storages()
+        print("[aidd-kos] LightRAG 起動完了", flush=True)
+    except Exception as e:
+        emit_error(LIGHTRAG_STARTUP_FAILED, f"LightRAG の起動に失敗しました: {e}")
+        raise RuntimeError("LIGHTRAG_STARTUP_FAILED") from e
 
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "lightrag.api.lightrag_server",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(_LIGHTRAG_PORT),
-            "--working-dir",
-            str(lightrag_dir),
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        env=_lightrag_env,
-    )
-
-    health_url = f"http://127.0.0.1:{_LIGHTRAG_PORT}/health"
-    started = False
-    for _ in range(_LIGHTRAG_HEALTH_CHECK_RETRIES):
-        if proc.poll() is not None:
-            break
-        try:
-            urllib.request.urlopen(health_url, timeout=1)
-            started = True
-            break
-        except (urllib.error.URLError, OSError):
-            await asyncio.sleep(1)
-
-    if not started:
-        # S-3: プロセス即時終了時のみ stderr を読み取り原因診断を remediation に付加
-        stderr_preview = ""
-        if proc.poll() is not None and proc.stderr:
-            with contextlib.suppress(OSError):
-                stderr_preview = proc.stderr.read(512).decode("utf-8", errors="replace").strip()
-        proc.terminate()
-        remediation = "LightRAG の起動に失敗しました。ポート競合・依存関係の確認を行ってください。"
-        if stderr_preview:
-            remediation += f" (stderr: {stderr_preview})"
-        emit_error(LIGHTRAG_STARTUP_FAILED, remediation)
-        raise RuntimeError("LIGHTRAG_STARTUP_FAILED")
-
-    print("[aidd-kos] LightRAG 起動完了", flush=True)
     try:
         yield
     finally:
         print("[aidd-kos] LightRAG 停止中...", flush=True)
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
+        if _rag is not None:
+            with contextlib.suppress(Exception):
+                await _rag.finalize_storages()
+        _rag = None
         print("[aidd-kos] LightRAG 停止完了", flush=True)
 
 
@@ -120,13 +73,6 @@ mcp = FastMCP(
     ),
     lifespan=_lifespan,
 )
-
-
-def _headers() -> dict:
-    h = {"Content-Type": "application/json"}
-    if LIGHTRAG_API_KEY:
-        h["Authorization"] = f"Bearer {LIGHTRAG_API_KEY}"
-    return h
 
 
 @mcp.tool()
@@ -146,6 +92,10 @@ async def lightrag_query(query: str, mode: str = "hybrid") -> str:
         emit_error(INVALID_MODE, f"有効な mode: {', '.join(sorted(_ALLOWED_MODES))}")
         return f"INVALID_MODE: '{mode}' は無効です。有効な値: {', '.join(sorted(_ALLOWED_MODES))}"
 
+    if _rag is None:
+        emit_error(LIGHTRAG_UNAVAILABLE, "LightRAG が初期化されていません")
+        return "LIGHTRAG_UNAVAILABLE: LightRAG が初期化されていません"
+
     lightrag_dir = Path.cwd() / ".lightrag"
     index_ready = lightrag_dir.exists() and any(
         f.suffix in {".json", ".graphml"} for f in lightrag_dir.iterdir() if f.is_file()
@@ -160,16 +110,15 @@ async def lightrag_query(query: str, mode: str = "hybrid") -> str:
         )
 
     try:
-        async with httpx.AsyncClient(timeout=_QUERY_TIMEOUT_S) as client:
-            resp = await client.post(
-                f"{LIGHTRAG_URL}/query",
-                json={"query": query, "mode": mode, "include_references": True},
-                headers=_headers(),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            answer = data.get("response", "")
-            refs = data.get("references") or []
+        import asyncio
+
+        from lightrag import QueryParam
+
+        async def _run_query() -> str:
+            result = await _rag.aquery_llm(query, QueryParam(mode=mode))
+            llm_resp = result.get("llm_response", {})
+            answer = llm_resp.get("response", "")
+            refs = llm_resp.get("references") or []
             sources = [
                 r["file_path"].replace("___", "/")
                 for r in refs
@@ -178,15 +127,17 @@ async def lightrag_query(query: str, mode: str = "hybrid") -> str:
             if sources:
                 answer += "\n\n参照:\n" + "\n".join(f"- {s}" for s in sources)
             return answer
-    except httpx.TimeoutException:
+
+        return await asyncio.wait_for(_run_query(), timeout=_QUERY_TIMEOUT_S)
+    except TimeoutError:
         emit_error(
             QUERY_TIMEOUT,
             f"クエリがタイムアウトしました（{_QUERY_TIMEOUT_S:.0f}秒）。LIGHTRAG_QUERY_TIMEOUT_MS 環境変数で調整できます。",
         )
         return "QUERY_TIMEOUT: クエリがタイムアウトしました"
-    except (httpx.ConnectError, httpx.HTTPStatusError, Exception) as e:
-        emit_error(LIGHTRAG_UNAVAILABLE, "task server:start を実行してください")
-        return f"LIGHTRAG_UNAVAILABLE: LightRAG サーバーに接続できません ({type(e).__name__})"
+    except Exception as e:
+        emit_error(LIGHTRAG_UNAVAILABLE, f"クエリ中にエラーが発生しました: {e}")
+        return f"LIGHTRAG_UNAVAILABLE: クエリ中にエラーが発生しました ({type(e).__name__})"
 
 
 @mcp.tool()
@@ -199,36 +150,25 @@ async def lightrag_list(limit: int = 20) -> str:
     Args:
         limit: Maximum number of documents to list.
     """
+    if _rag is None:
+        return "LIGHTRAG_UNAVAILABLE: LightRAG が初期化されていません"
+
     try:
-        async with httpx.AsyncClient(timeout=_QUERY_TIMEOUT_S) as client:
-            # LightRAG v1.5.0 では /documents/list が廃止され GET /documents を使用する
-            resp = await client.get(
-                f"{LIGHTRAG_URL}/documents",
-                headers=_headers(),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            # bare list を返す場合に AttributeError を防ぐ（status.py と同様の対応）
-            raw = data if isinstance(data, list) else data.get("statuses") or []
-            # LightRAG v1.5.0: statuses が {status: [doc,...]} 形式の辞書になる場合がある
-            # S-1: 値がイテラブルな場合のみフラット化（非イテラブル値の TypeError を防ぐ）
-            if isinstance(raw, dict):
-                docs = [d for group in raw.values() if isinstance(group, list) for d in group]
-            else:
-                docs = raw
-            docs = docs[:limit]
-            if not docs:
-                return "インデックス済みドキュメントなし"
-            lines = [
-                # C-1: content_summary が None の場合に TypeError が発生するため str() でキャスト
-                f"- {str(d.get('content_summary') or d.get('file_path') or d.get('id') or '?')[:80]}"
-                f" ({d.get('status', '?')})"
-                for d in docs
-            ]
-            return f"インデックス済みドキュメント ({len(docs)} 件):\n" + "\n".join(lines)
-    except (httpx.ConnectError, httpx.HTTPStatusError, Exception) as e:
-        emit_error(LIGHTRAG_UNAVAILABLE, "task server:start を実行してください")
-        return f"LIGHTRAG_UNAVAILABLE: LightRAG サーバーに接続できません ({type(e).__name__})"
+        from lightrag.base import DocStatus
+
+        docs_dict = await _rag.get_docs_by_status(DocStatus.PROCESSED)
+        docs = list(docs_dict.values())[:limit]
+        if not docs:
+            return "インデックス済みドキュメントなし"
+        lines = [
+            f"- {str(getattr(d, 'content_summary', None) or getattr(d, 'file_path', '?'))[:80]}"
+            f" ({getattr(d, 'status', '?')})"
+            for d in docs
+        ]
+        return f"インデックス済みドキュメント ({len(docs)} 件):\n" + "\n".join(lines)
+    except Exception as e:
+        emit_error(LIGHTRAG_UNAVAILABLE, f"ドキュメント一覧の取得に失敗しました: {e}")
+        return f"LIGHTRAG_UNAVAILABLE: ドキュメント一覧の取得に失敗しました ({type(e).__name__})"
 
 
 @mcp.tool()
@@ -246,7 +186,9 @@ async def kos_status() -> str:
     checker = StatusChecker()
     data = checker.check()
 
-    lr = data["lightrag"]
+    # LightRAG は in-process なのでプロセス状態を直接確認する
+    lr_status = "ready" if _rag is not None else "unavailable"
+
     cg = data["codegraph"]
 
     available_tools = [
@@ -265,13 +207,8 @@ async def kos_status() -> str:
             ]
         )
 
-    # AC-F03-02: インデックス日時・ドキュメント数を含める
-    lr_detail = lr["status"]
-    if lr.get("indexed_at"):
-        lr_detail += f" (indexed: {lr['indexed_at']}, docs: {lr.get('doc_count', 0)})"
-
     lines = [
-        f"LightRAG:   {lr_detail}",
+        f"LightRAG:   {lr_status} (in-process)",
         f"CodeGraph:  {cg['status']} (nodes: {cg.get('node_count', 0)})",
         f"available_tools: {', '.join(available_tools)}",
     ]

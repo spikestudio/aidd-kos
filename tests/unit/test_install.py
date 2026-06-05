@@ -88,3 +88,66 @@ def test_ac_f01_10_unit_init_storage_creates_lightrag_dir(project_dir: Path) -> 
         orch = InstallOrchestrator(project_dir=project_dir)
         orch.init_storage()
     assert (project_dir / ".lightrag").is_dir()
+
+
+# ── Feature #40: プロジェクトレベル MCP 登録 ─────────────────────────────────────
+
+
+def test_ac_f40_01_unit_register_mcp_default_writes_settings_local(
+    project_dir: Path, fake_home: Path
+) -> None:
+    """AC-F40-01: Unit - デフォルト動作で .claude/settings.local.json に cwd なしで書き込む"""
+    orch = InstallOrchestrator(project_dir=project_dir, global_install=False)
+    orch.register_mcp()
+
+    local_settings = project_dir / ".claude" / "settings.local.json"
+    assert local_settings.exists()
+    data = local_settings.read_text()
+    import json
+
+    parsed = json.loads(data)
+    entry = parsed["mcpServers"]["aidd-kos"]
+    assert "cwd" not in entry
+
+
+def test_ac_f40_01_unit_register_mcp_default_does_not_write_global(
+    project_dir: Path, fake_home: Path
+) -> None:
+    """AC-F40-03: Unit - デフォルト動作で ~/.claude/settings.json に書き込まない"""
+    orch = InstallOrchestrator(project_dir=project_dir, global_install=False)
+    orch.register_mcp()
+
+    global_settings = fake_home / ".claude" / "settings.json"
+    assert not global_settings.exists(), "~/.claude/settings.json に書き込まれた"
+
+
+def test_ac_f40_03_unit_register_mcp_does_not_modify_existing_global(
+    project_dir: Path, fake_home: Path
+) -> None:
+    """AC-F40-03: Unit - 既存グローバル設定の aidd-kos エントリを変更しない"""
+    import json
+
+    global_path = fake_home / ".claude" / "settings.json"
+    global_path.parent.mkdir(parents=True, exist_ok=True)
+    original = {"command": "uvx", "args": ["old"], "cwd": "/old/path"}
+    global_path.write_text(json.dumps({"mcpServers": {"aidd-kos": original}}))
+
+    orch = InstallOrchestrator(project_dir=project_dir, global_install=False)
+    orch.register_mcp()
+
+    data = json.loads(global_path.read_text())
+    assert data["mcpServers"]["aidd-kos"] == original
+
+
+def test_ac_f40_04_unit_register_mcp_global_writes_cwd(project_dir: Path, fake_home: Path) -> None:
+    """AC-F40-04: Unit - --global で ~/.claude/settings.json に cwd 付きで書き込む"""
+    import json
+
+    orch = InstallOrchestrator(project_dir=project_dir, global_install=True)
+    orch.register_mcp()
+
+    global_settings = fake_home / ".claude" / "settings.json"
+    assert global_settings.exists()
+    data = json.loads(global_settings.read_text())
+    entry = data["mcpServers"]["aidd-kos"]
+    assert entry["cwd"] == str(project_dir.resolve())

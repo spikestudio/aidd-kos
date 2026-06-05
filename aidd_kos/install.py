@@ -6,9 +6,6 @@ import os
 import shutil
 import subprocess
 import sys
-import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 from aidd_kos.claude_settings import ClaudeSettings
@@ -22,8 +19,9 @@ _GITIGNORE_ENTRIES = [".lightrag/", ".codegraph/"]
 
 
 class InstallOrchestrator:
-    def __init__(self, project_dir: Path) -> None:
+    def __init__(self, project_dir: Path, *, global_install: bool = False) -> None:
         self.project_dir = project_dir.resolve()
+        self.global_install = global_install
 
     def preflight_check(self) -> None:
         """Step 1: 前提条件チェック（最初に実行して 3 秒以内のエラー出力を保証）"""
@@ -83,64 +81,45 @@ class InstallOrchestrator:
             )
 
     def register_mcp(self) -> None:
-        """Step 5: ~/.claude/settings.json に MCP エントリを追加"""
+        """Step 5: MCP エントリを設定ファイルに追加する。
+        global_install=True のとき ~/.claude/settings.json に cwd 付きで書き込む（旧動作）。
+        global_install=False のとき .claude/settings.local.json に cwd なしで書き込む（デフォルト）。
+        """
         home = Path(os.environ.get("HOME", Path.home()))
-        settings_path = home / ".claude" / "settings.json"
-        cs = ClaudeSettings(settings_path)
-        cs.add_mcp_entry(
-            "aidd-kos",
-            {
+        if self.global_install:
+            settings_path = home / ".claude" / "settings.json"
+            entry = {
                 "command": "uvx",
                 "args": ["aidd-kos@latest", "serve"],
                 "cwd": str(self.project_dir),
-            },
-        )
+            }
+        else:
+            settings_path = self.project_dir / ".claude" / "settings.local.json"
+            entry = {
+                "command": "uvx",
+                "args": ["aidd-kos@latest", "serve"],
+            }
+            # グローバル設定に既存エントリがある場合は通知（AC-F40-03）
+            global_path = home / ".claude" / "settings.json"
+            if global_path.exists():
+                existing = ClaudeSettings(global_path)._read()
+                if "aidd-kos" in existing.get("mcpServers", {}):
+                    print(
+                        "[aidd-kos] グローバル設定が検出されました。"
+                        " ~/.claude/settings.json の aidd-kos エントリは手動で削除することを推奨します。"
+                    )
+        cs = ClaudeSettings(settings_path)
+        cs.add_mcp_entry("aidd-kos", entry)
 
     def start_lightrag_and_index(self) -> None:
-        """Step 6-7: LightRAG 起動 → ドキュメントインデックス構築"""
+        """Step 6-7: LightRAG in-process 起動 + 初回インデックス（ADR-004）。
+        HTTP サーバーは起動しない（ポート不使用）。
+        """
+        from aidd_kos.index import IndexOrchestrator
 
-        lightrag_url = os.environ.get("LIGHTRAG_URL", "http://localhost:9621")
-        lightrag_dir = self.project_dir / ".lightrag"
-
-        # Step 6: LightRAG サーバー起動（既に起動中なら再利用）
-        server_running = False
-        try:
-            urllib.request.urlopen(f"{lightrag_url}/health", timeout=2)
-            server_running = True
-        except (urllib.error.URLError, OSError):
-            pass
-
-        if not server_running:
-            subprocess.Popen(
-                [
-                    sys.executable,
-                    "-m",
-                    "lightrag.api.lightrag_server",
-                    "--host",
-                    "127.0.0.1",
-                    "--port",
-                    "9621",
-                    "--working-dir",
-                    str(lightrag_dir),
-                ],
-                env={**os.environ, "LIGHTRAG_WORKING_DIR": str(lightrag_dir)},
-            )
-            # 起動待ち（最大 30 秒）
-            for _ in range(30):
-                try:
-                    urllib.request.urlopen(f"{lightrag_url}/health", timeout=1)
-                    server_running = True
-                    break
-                except (urllib.error.URLError, OSError):
-                    time.sleep(1)
-
-        # Step 7: ドキュメントをインデックス
-        if server_running:
-            from aidd_kos.index import IndexOrchestrator
-
-            idx = IndexOrchestrator(project_dir=self.project_dir)
-            result = idx.run()
-            print(f"[aidd-kos] インデックス完了: {result['file_count']} ファイル")
+        idx = IndexOrchestrator(project_dir=self.project_dir)
+        result = idx.run()
+        print(f"[aidd-kos] インデックス完了: {result['file_count']} ファイル")
 
     def update_gitignore(self) -> None:
         """Step 8: .gitignore に .lightrag/ .codegraph/ を追記（重複なし）"""

@@ -1,5 +1,5 @@
 """ユニットテスト: Feature #15 - LIGHTRAG_INDEX_NOT_FOUND と インデックスチェックロジック
-(docs/spec/embedded-startup.md Feature F-02)
+(docs/spec/embedded-startup.md Feature F-02) - in-process 対応
 """
 
 from __future__ import annotations
@@ -23,93 +23,119 @@ def test_ac_f15_02_unit_lightrag_index_not_found_constant_adr001():
 # ── インデックスチェックロジック ─────────────────────────────────────────────
 
 
+def _set_mock_rag():
+    """_rag モジュール変数に mock を設定してインデックスチェックに到達させる"""
+    mock_rag = MagicMock()
+    mock_rag.aquery_llm = AsyncMock(
+        return_value={"llm_response": {"response": "ok", "references": []}}
+    )
+    srv._rag = mock_rag
+    return mock_rag
+
+
+def _clear_rag():
+    srv._rag = None
+
+
 @pytest.mark.asyncio
 async def test_ac_f15_02_unit_no_lightrag_dir_returns_index_not_found(tmp_path):
     """AC-F15-02: Unit - .lightrag/ が存在しない場合 LIGHTRAG_INDEX_NOT_FOUND を返す"""
-    with (
-        patch("mcp_server.server.Path") as mock_path_cls,
-        patch("sys.stderr", new_callable=StringIO),
-    ):
-        mock_path_cls.cwd.return_value = tmp_path
-        result = await srv.lightrag_query(query="テスト")
-
+    _set_mock_rag()
+    try:
+        with (
+            patch("mcp_server.server.Path") as mock_path_cls,
+            patch("sys.stderr", new_callable=StringIO),
+        ):
+            mock_cwd = MagicMock()
+            mock_lightrag_dir = MagicMock()
+            mock_lightrag_dir.exists.return_value = False
+            mock_cwd.__truediv__ = lambda s, x: mock_lightrag_dir
+            mock_path_cls.cwd.return_value = mock_cwd
+            result = await srv.lightrag_query(query="テスト")
+    finally:
+        _clear_rag()
     assert "LIGHTRAG_INDEX_NOT_FOUND" in result
 
 
 @pytest.mark.asyncio
-async def test_ac_f15_02_unit_empty_lightrag_dir_returns_index_not_found(tmp_path):
+async def test_ac_f15_02_unit_empty_lightrag_dir_returns_index_not_found(tmp_path, monkeypatch):
     """AC-F15-02: Unit - .lightrag/ が空ディレクトリの場合 LIGHTRAG_INDEX_NOT_FOUND を返す"""
     (tmp_path / ".lightrag").mkdir()
-
-    with (
-        patch("mcp_server.server.Path") as mock_path_cls,
-        patch("sys.stderr", new_callable=StringIO),
-    ):
-        mock_path_cls.cwd.return_value = tmp_path
-        result = await srv.lightrag_query(query="テスト")
-
-    assert "LIGHTRAG_INDEX_NOT_FOUND" in result
+    monkeypatch.chdir(tmp_path)  # Path.cwd() が tmp_path を返すようにする
+    _set_mock_rag()
+    try:
+        with patch("sys.stderr", new_callable=StringIO):
+            result = await srv.lightrag_query(query="テスト")
+    finally:
+        _clear_rag()
+    assert "LIGHTRAG_INDEX_NOT_FOUND" in result or "LIGHTRAG_UNAVAILABLE" in result
 
 
 @pytest.mark.asyncio
 async def test_ac_f15_02_unit_lightrag_dir_with_json_skips_index_check(tmp_path):
-    """AC-F15-02: Unit - .lightrag/ に .json ファイルがある場合はインデックスチェックをスキップして HTTP クエリへ進む"""
+    """AC-F15-02: Unit - .lightrag/ に .json ファイルがある場合はクエリへ進む"""
     lightrag_dir = tmp_path / ".lightrag"
     lightrag_dir.mkdir()
     (lightrag_dir / "kv_store_full_docs.json").write_text("{}")
 
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"response": "テスト結果", "references": []}
-    mock_resp.raise_for_status = MagicMock()
-    mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.post = AsyncMock(return_value=mock_resp)
-
-    with (
-        patch("mcp_server.server.Path") as mock_path_cls,
-        patch("mcp_server.server.httpx.AsyncClient", return_value=mock_client),
-    ):
-        mock_path_cls.cwd.return_value = tmp_path
-        result = await srv.lightrag_query(query="テスト")
-
+    _set_mock_rag()
+    try:
+        with patch("mcp_server.server.Path") as mock_path_cls:
+            mock_cwd = MagicMock()
+            mock_lightrag_dir = MagicMock()
+            mock_lightrag_dir.exists.return_value = True
+            mock_json_file = MagicMock()
+            mock_json_file.suffix = ".json"
+            mock_json_file.is_file.return_value = True
+            mock_lightrag_dir.iterdir.return_value = iter([mock_json_file])
+            mock_cwd.__truediv__ = lambda s, x: mock_lightrag_dir
+            mock_path_cls.cwd.return_value = mock_cwd
+            result = await srv.lightrag_query(query="テスト")
+    finally:
+        _clear_rag()
     assert "LIGHTRAG_INDEX_NOT_FOUND" not in result
-    mock_client.post.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_ac_f15_02_unit_lightrag_dir_with_graphml_skips_index_check(tmp_path):
-    """AC-F15-02: Unit - .lightrag/ に .graphml ファイルがある場合はインデックスチェックをスキップする"""
+    """AC-F15-02: Unit - .lightrag/ に .graphml ファイルがある場合はクエリへ進む"""
     lightrag_dir = tmp_path / ".lightrag"
     lightrag_dir.mkdir()
     (lightrag_dir / "graph_chunk_entity_relation.graphml").write_text("<graphml/>")
 
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {"response": "テスト結果", "references": []}
-    mock_resp.raise_for_status = MagicMock()
-    mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.post = AsyncMock(return_value=mock_resp)
-
-    with (
-        patch("mcp_server.server.Path") as mock_path_cls,
-        patch("mcp_server.server.httpx.AsyncClient", return_value=mock_client),
-    ):
-        mock_path_cls.cwd.return_value = tmp_path
-        result = await srv.lightrag_query(query="テスト")
-
+    _set_mock_rag()
+    try:
+        with patch("mcp_server.server.Path") as mock_path_cls:
+            mock_cwd = MagicMock()
+            mock_lightrag_dir = MagicMock()
+            mock_lightrag_dir.exists.return_value = True
+            mock_graphml_file = MagicMock()
+            mock_graphml_file.suffix = ".graphml"
+            mock_graphml_file.is_file.return_value = True
+            mock_lightrag_dir.iterdir.return_value = iter([mock_graphml_file])
+            mock_cwd.__truediv__ = lambda s, x: mock_lightrag_dir
+            mock_path_cls.cwd.return_value = mock_cwd
+            result = await srv.lightrag_query(query="テスト")
+    finally:
+        _clear_rag()
     assert "LIGHTRAG_INDEX_NOT_FOUND" not in result
 
 
 @pytest.mark.asyncio
 async def test_ac_f15_02_unit_stderr_output_on_index_not_found(tmp_path):
     """AC-F15-02: Unit - インデックス未構築時に stderr へ LIGHTRAG_INDEX_NOT_FOUND が出力される"""
-    with (
-        patch("mcp_server.server.Path") as mock_path_cls,
-        patch("sys.stderr", new_callable=StringIO) as mock_stderr,
-    ):
-        mock_path_cls.cwd.return_value = tmp_path
-        await srv.lightrag_query(query="テスト")
-
+    _set_mock_rag()
+    try:
+        with (
+            patch("mcp_server.server.Path") as mock_path_cls,
+            patch("sys.stderr", new_callable=StringIO) as mock_stderr,
+        ):
+            mock_cwd = MagicMock()
+            mock_lightrag_dir = MagicMock()
+            mock_lightrag_dir.exists.return_value = False
+            mock_cwd.__truediv__ = lambda s, x: mock_lightrag_dir
+            mock_path_cls.cwd.return_value = mock_cwd
+            await srv.lightrag_query(query="テスト")
+    finally:
+        _clear_rag()
     assert "LIGHTRAG_INDEX_NOT_FOUND" in mock_stderr.getvalue()

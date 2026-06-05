@@ -1,9 +1,9 @@
-"""ユニットテスト: aidd_kos.index (IndexOrchestrator)"""
+"""ユニットテスト: aidd_kos.index (IndexOrchestrator) - in-process 対応"""
 
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -14,8 +14,18 @@ from aidd_kos.index import IndexOrchestrator
 def project_dir(tmp_path: Path) -> Path:
     (tmp_path / "README.md").write_text("# Project")
     (tmp_path / "doc.txt").write_text("doc")
-    (tmp_path / "ignore.py").write_text("code")  # Python ファイルは除外
+    (tmp_path / "ignore.py").write_text("code")
     return tmp_path
+
+
+def _make_mock_rag(docs=None):
+    mock_rag = MagicMock()
+    mock_rag.initialize_storages = AsyncMock()
+    mock_rag.finalize_storages = AsyncMock()
+    mock_rag.get_docs_by_status = AsyncMock(return_value=docs or {})
+    mock_rag.ainsert = AsyncMock()
+    mock_rag.adelete_by_doc_id = AsyncMock()
+    return mock_rag
 
 
 def test_ac_f02_01_unit_collect_md_txt_only(project_dir: Path) -> None:
@@ -37,11 +47,8 @@ def test_ac_f02_02_unit_default_to_cwd(tmp_path: Path, monkeypatch: pytest.Monke
 
 def test_ac_f02_03_unit_returns_file_count(project_dir: Path) -> None:
     """AC-F02-03: Unit - run() がファイル数を含む結果を返す"""
-    with patch("aidd_kos.index.urllib.request.urlopen") as mock_urlopen:
-        mock_resp = MagicMock()
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        mock_urlopen.return_value = mock_resp
+    mock_rag = _make_mock_rag()
+    with patch("aidd_kos.index.create_lightrag_instance", return_value=mock_rag):
         idx = IndexOrchestrator(project_dir=project_dir)
         result = idx.run()
     assert result["file_count"] >= 1
@@ -49,11 +56,8 @@ def test_ac_f02_03_unit_returns_file_count(project_dir: Path) -> None:
 
 def test_ac_f02_04_unit_returns_elapsed_seconds(project_dir: Path) -> None:
     """AC-F02-04: Unit - run() が所要時間（秒）を含む結果を返す"""
-    with patch("aidd_kos.index.urllib.request.urlopen") as mock_urlopen:
-        mock_resp = MagicMock()
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        mock_urlopen.return_value = mock_resp
+    mock_rag = _make_mock_rag()
+    with patch("aidd_kos.index.create_lightrag_instance", return_value=mock_rag):
         idx = IndexOrchestrator(project_dir=project_dir)
         result = idx.run()
     assert "elapsed_seconds" in result
@@ -61,11 +65,10 @@ def test_ac_f02_04_unit_returns_elapsed_seconds(project_dir: Path) -> None:
 
 
 def test_ac_f02_05_unit_raises_on_lightrag_unavailable(project_dir: Path) -> None:
-    """AC-F02-05: Unit - LightRAG 未起動時に LIGHTRAG_UNAVAILABLE エラーを発生させる"""
-    import urllib.error
-
+    """AC-F02-05: Unit - LightRAG 初期化失敗時に LIGHTRAG_UNAVAILABLE エラーを発生させる"""
     with patch(
-        "aidd_kos.index.urllib.request.urlopen", side_effect=urllib.error.URLError("refused")
+        "aidd_kos.index.create_lightrag_instance",
+        side_effect=RuntimeError("connection failed"),
     ):
         idx = IndexOrchestrator(project_dir=project_dir)
         with pytest.raises(SystemExit) as exc_info:
