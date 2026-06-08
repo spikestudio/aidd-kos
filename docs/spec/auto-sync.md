@@ -2,7 +2,7 @@
 
 ## Feature F01: コミット後の自動インデックス設定手順の提供
 
-Issue: #[Feature Issue番号 — 作成後に更新]
+Issue: #43
 Epic: #26
 
 ### Stories
