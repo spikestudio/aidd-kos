@@ -15,6 +15,6 @@ Epic: #26
 
 | AC ID | Story | Given | When | Then |
 |-------|-------|-------|------|------|
-| AC-F[TBD]-01 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `aidd-kos index \|\| true` を含む lefthook.yml の post-commit 設定ブロックが記載されていること |
-| AC-F[TBD]-02 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `lefthook install` コマンドがセットアップ手順として記載されていること |
-| AC-F[TBD]-03 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `\|\| true` によってインデックス失敗がコミットを中断しない理由の説明が記載されていること |
+| AC-F43-01 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `aidd-kos index \|\| true` を含む lefthook.yml の post-commit 設定ブロックが記載されていること |
+| AC-F43-02 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `lefthook install` コマンドがセットアップ手順として記載されていること |
+| AC-F43-03 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `\|\| true` によってインデックス失敗がコミットを中断しない理由の説明が記載されていること |
