@@ -2,7 +2,7 @@
 
 <!-- aidd-glossary によって管理。手動編集可。追加・更新時は /aidd-glossary を実行する -->
 
-最終更新: 2026-06-04
+最終更新: 2026-06-08
 
 ## 用語一覧
 
@@ -299,5 +299,29 @@ Epic #38 以降の `aidd-kos install` のデフォルト動作。
 Claude Code はプロジェクトレベル設定を優先して読み込む。
 
 **用例**: プロジェクトに `.claude/settings.local.json` がある場合、Claude Code はそのプロジェクト固有の MCP 設定を使用し、グローバル設定より優先する。
+
+---
+
+### lefthook
+
+**定義**: git フックをプロジェクトで共有管理するためのフック管理ツール。`lefthook.yml` に設定を記述し `lefthook install` で有効化する。aidd-kos の post-commit 自動インデックス設定で使用する。
+
+**用例**: `lefthook.yml` に `aidd-kos index || true` を post-commit フックとして記述し `lefthook install` を実行すると、以降の全 git commit 後にインデックスが自動更新される。
+
+---
+
+### post-commit フック
+
+**定義**: git commit 操作が完了した後に自動実行されるフック。コミット自体は既に確定しており、フックの成否がコミットに影響しない。aidd-kos の自動インデックス更新はこのフックを使用する。
+
+**用例**: post-commit フックに `aidd-kos index || true` を設定すると、コミット完了後にインデックス更新が自動実行され、フックが失敗してもコミットはそのまま成立する。
+
+---
+
+### 自動インデックス更新
+
+**定義**: コミット後に手動操作なしで実行されるインデックス更新処理。lefthook post-commit フック経由で `aidd-kos index`（差分インデックス）を実行する。Epic #26 で設定手順が整備された。
+
+**用例**: 自動インデックス更新が設定済みの環境では、`git commit` 後に自動的に変更ファイルのみインデックスが更新され、AI Agent は次のクエリから最新情報を参照できる。
 
 ---
