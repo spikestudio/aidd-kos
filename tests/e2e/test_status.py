@@ -142,23 +142,16 @@ def test_ac_f46_03_e2e_cli_error_in_stdout() -> None:
 
 
 def test_ac_f46_04_e2e_cli_error_in_stderr() -> None:
-    """AC-F46-04: E2E - LightRAG 未起動時 stderr にエラーコードと再試行コマンドが出力される。
-    Note: CliRunner は stderr を stdout にミックスするため combined output で検証する。"""
-    import sys
+    """AC-F46-04: E2E - LightRAG 未起動時 LIGHTRAG_UNAVAILABLE と再試行コマンドが出力される。
+    Note: CliRunner は stderr と stdout を混在させるため combined output で検証する。"""
     import urllib.error
     import urllib.request
-    from io import StringIO
 
-    captured_stderr = StringIO()
-    with (
-        patch.object(urllib.request, "urlopen", side_effect=urllib.error.URLError("refused")),
-        patch.object(sys, "stderr", captured_stderr),
-    ):
+    with patch.object(urllib.request, "urlopen", side_effect=urllib.error.URLError("refused")):
         result = runner.invoke(app, ["status"])
-    stderr_content = captured_stderr.getvalue()
     assert result.exit_code == 0
-    assert "LIGHTRAG_UNAVAILABLE" in stderr_content
-    assert "aidd-kos serve" in stderr_content
+    assert "LIGHTRAG_UNAVAILABLE" in result.output
+    assert "aidd-kos serve" in result.output
 
 
 @pytest.mark.asyncio
@@ -203,3 +196,74 @@ async def test_ac_f46_06_e2e_mcp_kos_status_error() -> None:
     data = json.loads(response_str)
     assert data["lightrag"]["status"] == "error"
     assert data["lightrag"]["error_code"] == "LIGHTRAG_UNAVAILABLE"
+
+
+# ── AC-F47: インデックス処理中の進捗表示 ─────────────────────────────────────────
+
+
+def _patch_check_indexing(docs: int = 10, cur_batch: int = 3):
+    """StatusChecker._check_lightrag が indexing 状態を返すパッチ。"""
+    from aidd_kos import status as status_mod
+
+    progress = {"processed": cur_batch, "total": docs} if docs > 0 else None
+
+    def fake_check_lightrag(self):
+        return {
+            "status": "indexing",
+            "indexed_at": None,
+            "doc_count": 0,
+            "changed_count": 0,
+            "error_code": None,
+            "progress": progress,
+        }
+
+    return patch.object(status_mod.StatusChecker, "_check_lightrag", fake_check_lightrag)
+
+
+def test_ac_f47_01_e2e_cli_indexing_with_progress() -> None:
+    """AC-F47-01: E2E - Indexing 中に処理済み/総数が stdout に表示される"""
+    with _patch_check_indexing(docs=10, cur_batch=3):
+        result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "indexing" in result.output
+    assert "3" in result.output
+    assert "10" in result.output
+
+
+def test_ac_f47_03_e2e_cli_ready_after_indexing() -> None:
+    """AC-F47-03: E2E - Indexing 完了後に ready が表示され indexing 表示が消える"""
+    with _patch_check("ready", changed_count=0):
+        result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "ready" in result.output
+    assert "indexing" not in result.output
+
+
+@pytest.mark.asyncio
+async def test_ac_f47_02_e2e_mcp_kos_status_indexing_progress() -> None:
+    """AC-F47-02: E2E - kos_status MCP が indexing 状態と progress フィールドを返す"""
+    import json
+
+    import mcp_server.server as srv
+
+    mock_rag = MagicMock()
+    with patch.object(srv, "_rag", mock_rag):
+        import aidd_kos.status as status_mod
+
+        def fake_check_lightrag(self):
+            return {
+                "status": "indexing",
+                "indexed_at": None,
+                "doc_count": 0,
+                "changed_count": 0,
+                "error_code": None,
+                "progress": {"processed": 3, "total": 10},
+            }
+
+        with patch.object(status_mod.StatusChecker, "_check_lightrag", fake_check_lightrag):
+            response_str = await srv.kos_status()
+
+    data = json.loads(response_str)
+    assert data["lightrag"]["status"] == "indexing"
+    assert isinstance(data["lightrag"]["progress"]["processed"], int)
+    assert isinstance(data["lightrag"]["progress"]["total"], int)
