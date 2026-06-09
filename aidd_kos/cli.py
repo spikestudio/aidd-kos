@@ -96,8 +96,25 @@ def status(
 
     lr = data["lightrag"]
     cg = data["codegraph"]
-    typer.echo(f"  LightRAG:   {lr['status']}")
+
+    lr_status = lr["status"]
+    if lr_status == "stale":
+        lr_display = f"stale (変更 {lr.get('changed_count', 0)} 件)"
+    elif lr_status == "indexing" and lr.get("progress"):
+        prog = lr["progress"]
+        lr_display = f"indexing (処理中: {prog['processed']}/{prog['total']} 件)"
+    else:
+        lr_display = lr_status
+
+    typer.echo(f"  LightRAG:   {lr_display}")
     typer.echo(f"  CodeGraph:  {cg['status']} (nodes: {cg.get('node_count', 0)})")
+
+    if lr_status == "error":
+        error_code = lr.get("error_code", "LIGHTRAG_UNAVAILABLE")
+        typer.echo(
+            f"[{error_code}] LightRAG サーバーが起動していません。再試行: aidd-kos serve",
+            err=True,
+        )
 
 
 @app.command()

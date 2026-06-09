@@ -181,6 +181,12 @@ class IndexOrchestrator:
             )
             sys.exit(1)
 
+    def _write_last_indexed_at(self) -> None:
+        """正常完了後に .lightrag/last_indexed_at を更新する。"""
+        lightrag_path = Path(self._lightrag_dir)
+        lightrag_path.mkdir(parents=True, exist_ok=True)
+        (lightrag_path / "last_indexed_at").write_text(datetime.now(UTC).isoformat())
+
     def run(self, *, full: bool = False) -> dict:
         files = self.collect_files()
         start = time.monotonic()
@@ -201,6 +207,7 @@ class IndexOrchestrator:
                 sys.exit(1)
             elapsed = time.monotonic() - start
             full_count = len(files) - skipped_read
+            self._write_last_indexed_at()
             return {
                 "full_count": full_count,
                 "new_count": full_count,
@@ -237,6 +244,7 @@ class IndexOrchestrator:
 
         elapsed = time.monotonic() - start
         sent_count = len(to_process) - skipped_read
+        self._write_last_indexed_at()
         return {
             "new_count": len(new_files),
             "updated_count": len(modified_files),

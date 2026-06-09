@@ -2,7 +2,7 @@
 
 <!-- aidd-glossary によって管理。手動編集可。追加・更新時は /aidd-glossary を実行する -->
 
-最終更新: 2026-06-08
+最終更新: 2026-06-09
 
 ## 用語一覧
 
@@ -107,8 +107,8 @@
 
 ### kos_status
 
-**定義**: aidd-kos が提供する MCP ツール。LightRAG・CodeGraph 両エンジンの状態（ready/unavailable/indexing）・
-インデックス日時・利用可能ツール一覧を統合して返却する。旧名称: `get_status`（Epic #2 で改名）。
+**定義**: aidd-kos が提供する MCP ツール。LightRAG・CodeGraph 両エンジンの状態（Ready / Stale / Indexing / Error）・
+インデックス日時・利用可能ツール一覧を統合して返却する。旧名称: `get_status`（Epic #2 で改名）。Epic #27 で状態値を拡張（旧: ready/unavailable/indexing → 新: Ready/Stale/Indexing/Error）。
 
 **用例**: kos_status を呼び出すことで、全ナレッジエンジンの稼働状態と利用可能ツールを MCP 経由で即座に確認できる。
 
@@ -323,5 +323,55 @@ Claude Code はプロジェクトレベル設定を優先して読み込む。
 **定義**: コミット後に手動操作なしで実行されるインデックス更新処理。lefthook post-commit フック経由で `aidd-kos index`（差分インデックス）を実行する。Epic #26 で設定手順が整備された。
 
 **用例**: 自動インデックス更新が設定済みの環境では、`git commit` 後に自動的に変更ファイルのみインデックスが更新され、AI Agent は次のクエリから最新情報を参照できる。
+
+---
+
+### インデックス状態
+
+**定義**: ナレッジインデックスの現在の鮮度・稼働状況を 4 値（Ready / Stale / Indexing / Error）で表した分類。
+`aidd-kos status` コマンドおよび `kos_status` MCP ツールが返す。Epic #27 で旧 3 値から拡張された。
+
+**用例**: `aidd-kos status` を実行すると `LightRAG: stale (変更 3 件)` と表示され、インデックスが古いことと変更ファイル数を即座に把握できる。
+
+---
+
+### Stale（インデックス状態）
+
+**定義**: インデックス済みだが、最終インデックス実行後にプロジェクト配下の `.md`/`.txt` ファイルが 1 件以上変更された状態。`aidd-kos index` の実行で Ready に戻る。
+
+**用例**: ドキュメントを編集後に `aidd-kos status` を実行すると `LightRAG: stale (変更 1 件)` と表示される。
+
+---
+
+### Error（インデックス状態）
+
+**定義**: LightRAG サーバーに接続できない状態。旧名称: `unavailable`（Epic #27 で改名・具体化）。エラーコードと再試行コマンドが表示される。
+
+**用例**: LightRAG サーバー未起動時に `aidd-kos status` を実行すると `LightRAG: error` と表示され、
+stderr にエラーコードと再試行コマンドが出力される。
+
+---
+
+### エラーコード
+
+**定義**: Error 状態の具体的な原因を識別する文字列。`aidd-kos status` 実行時に stderr へ出力され、オペレーターが対処方法を特定するために使用する。例: `LIGHTRAG_UNAVAILABLE`。
+
+**用例**: `[LIGHTRAG_UNAVAILABLE]` というエラーコードを確認したオペレーターは `aidd-kos serve` を実行してサーバーを起動する。
+
+---
+
+### 再試行コマンド
+
+**定義**: エラー解消のために実行すべき具体的な CLI コマンド。エラーコードとともに stderr に出力される。例: `aidd-kos serve`。
+
+**用例**: Error 状態で `再試行: aidd-kos serve` と表示された場合、オペレーターはそのコマンドを実行することでサーバーを再起動できる。
+
+---
+
+### インデックス進捗
+
+**定義**: Indexing 状態のとき `aidd-kos status` が表示する「処理済み件数 / 総件数」の情報。完了見込みの目安としてオペレーターが参照する。
+
+**用例**: `LightRAG: indexing (処理中: 7/20 件)` と表示された場合、オペレーターは 20 件中 7 件が処理済みであることを確認できる。
 
 ---

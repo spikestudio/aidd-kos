@@ -178,16 +178,27 @@ async def kos_status() -> str:
     Use this tool to verify the system is ready before starting a work session,
     or to understand which tools are available.
 
-    Returns status of LightRAG (ready/unavailable/indexing) and CodeGraph (ready/unavailable),
-    plus the list of available tools.
+    Returns JSON with LightRAG status (ready/stale/indexing/error), CodeGraph status,
+    and available tools list.
     """
+    import json
+
     from aidd_kos.status import StatusChecker
 
     checker = StatusChecker()
     data = checker.check()
 
-    # LightRAG は in-process なのでプロセス状態を直接確認する
-    lr_status = "ready" if _rag is not None else "unavailable"
+    # in-process 状態を優先: _rag が None なら error（lifespan が未完了/失敗）
+    if _rag is None:
+        lr_info = {
+            "status": "error",
+            "indexed_at": None,
+            "doc_count": 0,
+            "changed_count": 0,
+            "error_code": "LIGHTRAG_UNAVAILABLE",
+        }
+    else:
+        lr_info = data["lightrag"]
 
     cg = data["codegraph"]
 
@@ -207,12 +218,12 @@ async def kos_status() -> str:
             ]
         )
 
-    lines = [
-        f"LightRAG:   {lr_status} (in-process)",
-        f"CodeGraph:  {cg['status']} (nodes: {cg.get('node_count', 0)})",
-        f"available_tools: {', '.join(available_tools)}",
-    ]
-    return "\n".join(lines)
+    result = {
+        "lightrag": lr_info,
+        "codegraph": cg,
+        "available_tools": available_tools,
+    }
+    return json.dumps(result, ensure_ascii=False)
 
 
 # ── CodeGraph proxy（ADR-002: NpxStdioTransport + create_proxy + mount）─────────

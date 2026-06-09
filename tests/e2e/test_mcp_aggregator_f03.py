@@ -1,7 +1,8 @@
-"""E2E テスト: F-03 kos_status ツール - in-process 対応"""
+"""E2E テスト: F-03 kos_status ツール - in-process 対応（JSON レスポンス形式）"""
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,49 +22,70 @@ def _clear_rag():
 
 @pytest.mark.asyncio
 async def test_ac_f03_01_kos_status_returns_both_engines():
-    """AC-F03-01: kos_status が LightRAG と CodeGraph の状態を返す"""
+    """AC-F03-01: kos_status が LightRAG と CodeGraph の状態を JSON で返す"""
     _set_mock_rag()
     try:
         with patch("aidd_kos.status.StatusChecker.check") as mock_check:
             mock_check.return_value = {
-                "lightrag": {"status": "ready"},
+                "lightrag": {
+                    "status": "ready",
+                    "indexed_at": None,
+                    "doc_count": 0,
+                    "changed_count": 0,
+                    "error_code": None,
+                },
                 "codegraph": {"status": "ready", "node_count": 100},
             }
             result = await srv.kos_status()
     finally:
         _clear_rag()
-    assert "LightRAG" in result
-    assert "CodeGraph" in result
+    data = json.loads(result)
+    assert "lightrag" in data
+    assert "codegraph" in data
 
 
 @pytest.mark.asyncio
 async def test_ac_f03_01_lightrag_unavailable():
-    """AC-F03-01: _rag が None のとき LightRAG が unavailable として表示される"""
+    """AC-F03-01: _rag が None のとき LightRAG が error として返される"""
     _clear_rag()
     with patch("aidd_kos.status.StatusChecker.check") as mock_check:
         mock_check.return_value = {
-            "lightrag": {"status": "unavailable"},
+            "lightrag": {
+                "status": "unavailable",
+                "indexed_at": None,
+                "doc_count": 0,
+                "changed_count": 0,
+                "error_code": None,
+            },
             "codegraph": {"status": "unavailable", "node_count": 0},
         }
         result = await srv.kos_status()
-    assert "unavailable" in result
+    data = json.loads(result)
+    assert data["lightrag"]["status"] == "error"
+    assert data["lightrag"]["error_code"] == "LIGHTRAG_UNAVAILABLE"
 
 
 @pytest.mark.asyncio
 async def test_ac_f03_01_lightrag_indexing():
-    """AC-F03-01: _rag が設定されているとき LightRAG が ready として表示される"""
+    """AC-F03-01: _rag が設定されているとき StatusChecker の状態がそのまま返される"""
     _set_mock_rag()
     try:
         with patch("aidd_kos.status.StatusChecker.check") as mock_check:
             mock_check.return_value = {
-                "lightrag": {"status": "indexing"},
+                "lightrag": {
+                    "status": "indexing",
+                    "indexed_at": None,
+                    "doc_count": 0,
+                    "changed_count": 0,
+                    "error_code": None,
+                },
                 "codegraph": {"status": "ready", "node_count": 50},
             }
             result = await srv.kos_status()
     finally:
         _clear_rag()
-    assert "LightRAG" in result
-    assert "in-process" in result
+    data = json.loads(result)
+    assert data["lightrag"]["status"] == "indexing"
 
 
 @pytest.mark.asyncio
@@ -73,11 +95,18 @@ async def test_ac_f03_03_available_tools_in_response():
     try:
         with patch("aidd_kos.status.StatusChecker.check") as mock_check:
             mock_check.return_value = {
-                "lightrag": {"status": "ready"},
+                "lightrag": {
+                    "status": "ready",
+                    "indexed_at": None,
+                    "doc_count": 0,
+                    "changed_count": 0,
+                    "error_code": None,
+                },
                 "codegraph": {"status": "ready", "node_count": 10},
             }
             result = await srv.kos_status()
     finally:
         _clear_rag()
-    assert "available_tools" in result
-    assert "lightrag_query" in result
+    data = json.loads(result)
+    assert "available_tools" in data
+    assert "lightrag_query" in data["available_tools"]

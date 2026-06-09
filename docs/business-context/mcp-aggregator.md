@@ -14,7 +14,7 @@ Epic: #2
 | Doc Intelligence Engine | LightRAG によるドキュメント知識エンジン。`lightrag_*` prefix のツールを公開する | MCP Server の embedded サブプロセスとして起動 |
 | Code Intelligence Engine | CodeGraph による AST・呼び出しグラフ知識エンジン。`codegraph_*` prefix のツールを公開する | MCP Server が npx プロセスを proxy して公開 |
 | エンジン prefix | MCP ツール名に付与する `lightrag_` / `codegraph_` 等のエンジン識別子。AI Agent がどのエンジンを呼んでいるか認識した上で自律判断できるようにする | 新エンジン追加時も prefix 体系で一意性を保つ |
-| エンジン状態 | `ready` / `unavailable` / `indexing` の 3 値。`indexing` は LightRAG 側のみ発生し得る（CodeGraph は起動成否の 2 値） | AC-F03-01 参照。エンジン種別によって取りうる状態値が異なる点に注意 |
+| エンジン状態 | LightRAG: `ready` / `stale` / `error` / `indexing` の 4 値（Epic #27 で `unavailable` を `error` に改名・`stale` を新規追加）。CodeGraph: `ready` / `unavailable` の 2 値 | エンジン種別によって取りうる状態値が異なる点に注意 |
 | アプリケーション層エラーコード | `LIGHTRAG_UNAVAILABLE` / `CODEGRAPH_UNAVAILABLE` 等のエラー識別子。MCP 標準の JSON-RPC エラーコード（`-32xxx`）とは別の、aidd-kos 固有のアプリケーション層エラー文字列 | remediation（対処方法）を必ずセットで返す |
 | remediation | エラーコードに付随する対処手順文字列。AI Agent が次のアクションを自律決定できるよう、エラーと対で必ず返す | NFR: 3秒以内に stderr へ出力 |
 | available_tools | `kos_status` ツールが返す応答フィールド。現在利用可能なすべての MCP ツール名一覧。MCP 標準の `tools/list` とは別の kos_status 固有フィールド | AC-F03-03 参照 |
@@ -45,7 +45,7 @@ Epic: #2
 | lightrag_list | LightRAG インデックス済みドキュメント一覧ツール。インデックスされているファイルのパス一覧を返す |
 | codegraph_explore | CodeGraph コード探索ツール（代表例）。コードの構造・シンボル・呼び出しグラフを探索する |
 | codegraph_impact | 変更影響範囲分析ツール。`{impacts: [{name, kind}]}` 形式で影響を受けるシンボル一覧を返す |
-| kos_status | 全エンジンの状態（ready/unavailable/indexing）・最終更新日時・インデックス件数・available_tools を返す統合ステータスツール |
+| kos_status | 全エンジンの状態（LightRAG: ready/stale/error/indexing、CodeGraph: ready/unavailable）・インデックス件数・progress・available_tools を返す統合ステータスツール（JSON 形式）。Epic #27 で状態値を拡張 |
 | エンジン未起動エラー | LightRAG または CodeGraph のプロセスが到達不能なときに返すエラー。`LIGHTRAG_UNAVAILABLE` / `CODEGRAPH_UNAVAILABLE` のエラーコードと remediation をセットで返す |
 | embedded 起動 | MCP Server が LightRAG をサブプロセスとして自動起動・自動停止する方式。オペレーターが LightRAG を独立起動する必要がない（Epic #3 で実装） |
 | proxy | FastMCP が外部プロセス（CodeGraph npx）のツールを自サーバーのツールとして公開する機能。`create_proxy()` + `mount(namespace=)` で実現 |
@@ -61,7 +61,7 @@ Epic: #2
 - `lightrag_*` ツールの外部インターフェース仕様（パラメータ・応答形式・エラーコード）
 - `codegraph_*` ツールの外部インターフェース仕様（prefix 命名・応答形式・エラーコード）
 - `kos_status` ツールの統合ステータス仕様
-- エンジン状態モデル（ready / unavailable / indexing）の定義
+- エンジン状態モデル（LightRAG: ready/stale/error/indexing、CodeGraph: ready/unavailable）の定義
 
 ### このコンテキストが扱わない範囲（隣接コンテキスト）
 
