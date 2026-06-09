@@ -113,30 +113,30 @@ remediation メッセージを追加する場合は `errors.py` の `emit_error(
 
 ### Spec 追記
 
-- [ ] specs/e2e/46-status-4values.md 作成
+- [x] specs/e2e/46-status-4values.md 作成
   → 完了条件: AC-F46-01〜06 が全て 1 件以上のシナリオに対応
 
 ### テスト実装（RED）
 
-- [ ] ユニットテスト実装（tests/unit/test_status.py に追記）
+- [x] ユニットテスト実装（tests/unit/test_status.py に追記）
   → 完了条件: AC-F46-01〜04 の各状態をカバーするテストが RED
-- [ ] ユニットテスト実装（tests/unit/test_lifespan.py または新規ファイルに追記）
+- [x] ユニットテスト実装（tests/unit/test_lifespan.py または新規ファイルに追記）
   → 完了条件: AC-F46-05/06 をカバーするテストが RED（`_rag` モック前提）
-- [ ] E2E テスト実装（tests/e2e/test_status.py に追記）
+- [x] E2E テスト実装（tests/e2e/test_status.py に追記）
   → 完了条件: E2E シナリオが RED
 
 ### 実装・検証
 
-- [ ] `aidd_kos/index.py` に `last_indexed_at` 書き込みを追加
+- [x] `aidd_kos/index.py` に `last_indexed_at` 書き込みを追加
   → 完了条件: 正常完了後に `.lightrag/last_indexed_at` が書き込まれる。
      `--full` モードでは `rmtree` の後に書き込む。`sys.exit(1)` 時は書き込まない
-- [ ] `aidd_kos/status.py:StatusChecker._check_lightrag()` を拡張（判定優先順に従う）
+- [x] `aidd_kos/status.py:StatusChecker._check_lightrag()` を拡張（判定優先順に従う）
   → 完了条件: ユニットテスト GREEN（error/indexing/stale/ready の各状態）
-- [ ] `aidd_kos/cli.py:status()` 出力フォーマット更新（上記インデント込みフォーマット）
+- [x] `aidd_kos/cli.py:status()` 出力フォーマット更新（上記インデント込みフォーマット）
   → 完了条件: ユニットテスト GREEN + stdout/stderr フォーマット一致
-- [ ] `mcp_server/server.py:kos_status()` を JSON レスポンスに更新
+- [x] `mcp_server/server.py:kos_status()` を JSON レスポンスに更新
   → 完了条件: ユニットテスト GREEN + AC-F46-05/06 充足（`_rag` モック使用）
-- [ ] リファクタ
+- [x] リファクタ
   → 完了条件: 全テストが GREEN かつ `uv run ruff check . && uv run ruff format --check .` PASS
-- [ ] AC カバレッジ確認
+- [x] AC カバレッジ確認
   → 完了条件: `git grep "AC-F46"` で全テストコードが発見できること
