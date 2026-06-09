@@ -83,25 +83,25 @@ Feature #46 の Stale 検出ロジックに引き渡される（`last_indexed_at
 
 ### Spec 追記
 
-- [ ] specs/e2e/47-indexing-progress.md 作成
+- [x] specs/e2e/47-indexing-progress.md 作成
   → 完了条件: AC-F47-01/02/03 が全て 1 件以上のシナリオに対応
 
 ### テスト実装（RED）
 
-- [ ] ユニットテスト実装（tests/unit/test_status.py に追記）
+- [x] ユニットテスト実装（tests/unit/test_status.py に追記）
   → 完了条件: AC-F47-01〜03 をカバーするテストが RED
-- [ ] E2E テスト実装（tests/e2e/test_status.py に追記）
+- [x] E2E テスト実装（tests/e2e/test_status.py に追記）
   → 完了条件: E2E シナリオが RED
 
 ### 実装・検証
 
-- [ ] `aidd_kos/status.py:_check_lightrag()` に `progress` フィールド追加
+- [x] `aidd_kos/status.py:_check_lightrag()` に `progress` フィールド追加
   → 完了条件: `busy=true` 時に `progress.total=docs, progress.processed=cur_batch` を返す
-- [ ] `aidd_kos/cli.py:status()` の indexing 表示に進捗を追加
+- [x] `aidd_kos/cli.py:status()` の indexing 表示に進捗を追加
   → 完了条件: ユニットテスト GREEN + `LightRAG: indexing (処理中: N/M 件)` が表示される
-- [ ] `mcp_server/server.py:kos_status()` に `progress` フィールド追加
+- [x] `mcp_server/server.py:kos_status()` に `progress` フィールド追加
   → 完了条件: ユニットテスト GREEN + AC-F47-02 充足
-- [ ] リファクタ
+- [x] リファクタ
   → 完了条件: 全テストが GREEN かつ lint/型チェック PASS
-- [ ] AC カバレッジ確認
+- [x] AC カバレッジ確認
   → 完了条件: `git grep "AC-F47"` で全テストコードが発見できること
