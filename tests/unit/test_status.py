@@ -61,13 +61,13 @@ def test_ac_f03_01_unit_lightrag_indexing() -> None:
 
 
 def test_ac_f03_01_unit_lightrag_unavailable() -> None:
-    """AC-F03-01: Unit - LightRAG が応答しない場合 unavailable を返す"""
+    """AC-F03-01: Unit - LightRAG が応答しない場合 error を返す（旧: unavailable）"""
     with patch.object(urllib.request, "urlopen", side_effect=urllib.error.URLError("refused")):
         from aidd_kos.status import StatusChecker
 
         checker = StatusChecker()
         result = checker.check()
-    assert result["lightrag"]["status"] == "unavailable"
+    assert result["lightrag"]["status"] == "error"
 
 
 def test_ac_f03_01_unit_lightrag_returns_indexed_at(tmp_path) -> None:
