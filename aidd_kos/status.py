@@ -45,12 +45,17 @@ class StatusChecker:
 
         # 判定優先順: indexing → stale → ready
         status = "ready"
+        progress: dict | None = None
         pipeline_url = _LIGHTRAG_PIPELINE_URL_TPL.format(self._lightrag_url)
         try:
             with urllib.request.urlopen(pipeline_url, timeout=2) as resp:
                 pipeline = json.loads(resp.read())
             if pipeline.get("busy"):
                 status = "indexing"
+                docs = pipeline.get("docs", 0)
+                cur_batch = pipeline.get("cur_batch", 0)
+                if docs > 0:
+                    progress = {"processed": cur_batch, "total": docs}
         except (urllib.error.URLError, OSError, json.JSONDecodeError):
             pass
 
@@ -89,6 +94,7 @@ class StatusChecker:
             "doc_count": doc_count,
             "changed_count": changed_count,
             "error_code": None,
+            "progress": progress,
         }
 
     def _count_changed_files(self, indexed_at: str) -> int:

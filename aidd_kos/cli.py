@@ -100,6 +100,9 @@ def status(
     lr_status = lr["status"]
     if lr_status == "stale":
         lr_display = f"stale (変更 {lr.get('changed_count', 0)} 件)"
+    elif lr_status == "indexing" and lr.get("progress"):
+        prog = lr["progress"]
+        lr_display = f"indexing (処理中: {prog['processed']}/{prog['total']} 件)"
     else:
         lr_display = lr_status
 
