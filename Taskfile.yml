@@ -115,3 +115,14 @@ tasks:
       - mise install
       - lefthook install
       - uv sync
+
+  # ── ワークツリー ──────────────────────────────────────────────────────────────
+  wt:create:
+    desc: "新規ワークツリーを作成する（例: task wt:create BRANCH=feature/ES-27-slug）"
+    cmds:
+      - git worktree add .wt/{{.BRANCH}} -b {{.BRANCH}}
+
+  wt:remove:
+    desc: "ワークツリーを削除する（例: task wt:remove BRANCH=feature/ES-27-slug）"
+    cmds:
+      - git worktree remove .wt/{{.BRANCH}} --force
