@@ -6,24 +6,6 @@ on:
     types: [opened, reopened, synchronize, labeled, unlabeled]
 
 jobs:
-  reset-gates:
-    name: Reset Gates
-    runs-on: ubuntu-latest
-    if: github.event.action == 'synchronize'
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Remove gate labels on new push
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          for label in "gate:reviewed"; do
-            gh pr edit ${{ github.event.pull_request.number }} \
-              --repo ${{ github.repository }} \
-              --remove-label "$label" 2>/dev/null || true
-          done
-          echo "⚠️ Gate labels reset — re-review required"
-
   skip-epic-check:
     name: Epic Complete Check
     runs-on: ubuntu-latest
@@ -113,7 +95,6 @@ jobs:
   check-gates:
     name: Merge Gate Check
     runs-on: ubuntu-latest
-    if: github.event.action != 'synchronize'
     permissions:
       pull-requests: read
       statuses: write
@@ -158,26 +139,3 @@ jobs:
             --field description="All gate labels present" || true
           echo "✅ All gate labels present. Merge is allowed."
 
-  gate-after-reset:
-    name: Gate Reset Notification
-    runs-on: ubuntu-latest
-    if: |
-      github.event.action == 'synchronize' &&
-      needs.reset-gates.result == 'success'
-    needs: reset-gates
-    permissions:
-      statuses: write
-    steps:
-      - name: Gates reset
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.event.pull_request.head.sha }}
-          STATUS_CONTEXT: Merge Gate Check
-        run: |
-          gh api "repos/${{ github.repository }}/statuses/$SHA" \
-            --method POST \
-            --field state=failure \
-            --field context="$STATUS_CONTEXT" \
-            --field description="Gate labels reset — re-review required" || true
-          echo "::error::Gate labels were reset due to new commits. Re-review required."
-          exit 1
