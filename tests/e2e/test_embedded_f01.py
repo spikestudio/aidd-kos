@@ -54,19 +54,32 @@ async def test_ac_f41_01_lightrag_query_available_immediately_after_startup():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="テスト環境で LightRAG が稼働中の場合があるため手動確認")
 async def test_ac_f41_03_startup_completes_without_port_binding():
-    """AC-F41-03: E2E - 起動が外部ポートなしで完了する（ポート 9621 LISTEN なし）"""
+    """AC-F41-03: E2E - 起動が外部ポートなしで完了する（ポート 9621 LISTEN なし）
+
+    lifespan 起動前後のポート状態を比較し、
+    self のコードが新たにポート 9621 をバインドしていないことを検証する。
+    他プロセスが既にポート 9621 を使用している場合は誤検知しない。
+    """
+
+    def _port_listening(port: int) -> bool:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.1):
+                return True
+        except (ConnectionRefusedError, OSError):
+            return False
+
+    port_open_before = _port_listening(9621)
+
     mock_rag = _make_mock_rag()
-    port_9621_used = False
     with patch("mcp_server.server.create_lightrag_instance", return_value=mock_rag):
         async with srv._lifespan(None):
-            try:
-                with socket.create_connection(("127.0.0.1", 9621), timeout=0.1):
-                    port_9621_used = True
-            except (ConnectionRefusedError, OSError):
-                port_9621_used = False
-    assert not port_9621_used
+            port_open_during = _port_listening(9621)
+
+    # 起動前に閉じていたポートが lifespan によって新たに開かれていないこと
+    assert not (port_open_during and not port_open_before), (
+        "lifespan 起動によってポート 9621 が新たにバインドされました"
+    )
 
 
 @pytest.mark.asyncio
