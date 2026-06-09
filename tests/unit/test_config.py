@@ -2,6 +2,14 @@
 
 LightRAG との接合部（_llm_func クロージャ）の呼び出し規約を検証する。
 外部ライブラリ lightrag-hku の API 変更による回帰を防ぐ。
+
+# バグ #55 の実際の原因（回帰防止のため記録）
+# lightrag-hku 1.5.1+ は llm_model_func を位置引数で呼ぶ。
+#   use_llm_func(safe_user_prompt, system_prompt=..., ...)
+# openai_complete_if_cache の第1引数は model であるため、
+#   partial(openai_complete_if_cache, model=llm_model)(safe_user_prompt, ...)
+# は「model」を位置引数と keyword 引数の両方で受け取り TypeError になる。
+# クロージャで model を先頭位置引数として渡すことで衝突を回避する。
 """
 
 from __future__ import annotations
@@ -17,11 +25,6 @@ def _make_lightrag_mock():
     mock.initialize_storages = AsyncMock()
     mock.finalize_storages = AsyncMock()
     return mock
-
-
-def _extract_llm_func(lightrag_mock_call_kwargs: dict) -> object:
-    """LightRAG() コンストラクタに渡された llm_model_func を取り出す。"""
-    return lightrag_mock_call_kwargs.get("llm_model_func")
 
 
 # ── AC: _llm_func はモデルを位置引数として渡す ────────────────────────────────
@@ -55,8 +58,14 @@ async def test_llm_func_passes_model_as_positional_arg(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_llm_func_removes_model_kwarg_from_lightrag(monkeypatch) -> None:
-    """lightrag-hku 1.5.1+ が model= をキーワードで渡してきても二重指定にならない（#55 回帰防止）。"""
+async def test_llm_func_no_double_model_arg_regression(monkeypatch) -> None:
+    """#55 回帰防止: partial(model=...) 方式では起きる「multiple values for model」が起きないこと。
+
+    lightrag-hku 1.5.1+ は use_llm_func(safe_user_prompt, ...) と位置引数で呼ぶ。
+    openai_complete_if_cache の第1引数は model なので、
+    partial(model=llm_model) では safe_user_prompt が model に位置バインドされ衝突する。
+    クロージャ方式では llm_model が先頭位置引数のため衝突しない。
+    """
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("LLM_MODEL", "gpt-4o-mini")
 
@@ -72,18 +81,19 @@ async def test_llm_func_removes_model_kwarg_from_lightrag(monkeypatch) -> None:
         create_lightrag_instance("/tmp/test")
         llm_func = mock_lightrag_cls.call_args.kwargs["llm_model_func"]
 
-        # LightRAG 1.5.1 スタイル: model= をキーワードで渡す
-        await llm_func("prompt text", model="gpt-4o")
+        # LightRAG 1.5.1 スタイル: prompt を第1位置引数で渡す（model は来ない）
+        await llm_func("safe_user_prompt_text", system_prompt="sys")
 
-    # model= は除去され、位置引数として正しく渡される
+    # モデルは先頭位置引数として正しく渡され、二重指定エラーは起きない
     _args, kwargs = mock_complete.call_args
-    assert _args[0] == "gpt-4o-mini", "設定済みモデルが位置引数として使われること"
-    assert "model" not in kwargs, "kwargs に model= が残っていないこと"
+    assert _args[0] == "gpt-4o-mini"
+    assert _args[1] == "safe_user_prompt_text"
+    assert kwargs.get("system_prompt") == "sys"
 
 
 @pytest.mark.asyncio
 async def test_llm_func_passes_through_other_kwargs(monkeypatch) -> None:
-    """model= 以外のキーワード引数は透過的に渡される。"""
+    """system_prompt / history_messages などのキーワード引数は透過的に渡される。"""
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
     mock_complete = AsyncMock(return_value="response")
@@ -98,12 +108,11 @@ async def test_llm_func_passes_through_other_kwargs(monkeypatch) -> None:
         create_lightrag_instance("/tmp/test")
         llm_func = mock_lightrag_cls.call_args.kwargs["llm_model_func"]
 
-        await llm_func("prompt", model="ignored", system_prompt="sys", temperature=0.7)
+        await llm_func("prompt", system_prompt="sys", temperature=0.7)
 
     _args, kwargs = mock_complete.call_args
     assert kwargs.get("system_prompt") == "sys"
     assert kwargs.get("temperature") == 0.7
-    assert "model" not in kwargs
 
 
 @pytest.mark.asyncio

@@ -19,8 +19,10 @@ def create_lightrag_instance(working_dir: str):  # type: ignore[return]
     """LightRAG インスタンスを生成する（OpenAI バインディング）。
     OPENAI_API_KEY が必要。LLM_MODEL・EMBEDDING_MODEL は環境変数またはデフォルト値を使用する。
     注: openai_embed は既に EmbeddingFunc インスタンスのため、二重ラップ禁止。
-    注: lightrag-hku 1.5.1+ は llm_model_func 呼び出し時に model= をキーワードで渡す場合がある。
-        functools.partial(model=...) を使うと二重指定エラー（#55）になるため、クロージャを使用する。
+    注: openai_complete_if_cache の第1引数は model。lightrag-hku 1.5.1+ は
+        llm_model_func を位置引数で呼ぶため（safe_user_prompt が第1位置引数）、
+        partial(model=llm_model) では「got multiple values for argument 'model'」エラーになる（#55）。
+        クロージャで model を先頭位置引数として渡すことで衝突を回避する。
     """
     from lightrag import LightRAG
     from lightrag.llm.openai import openai_complete_if_cache, openai_embed
@@ -28,9 +30,6 @@ def create_lightrag_instance(working_dir: str):  # type: ignore[return]
     llm_model = os.environ.get("LLM_MODEL", LIGHTRAG_ENV_DEFAULTS["LLM_MODEL"])
 
     async def _llm_func(*args: object, **kwargs: object) -> str:
-        # LightRAG が model= をキーワードで渡してくる場合に備えて除去し、
-        # 位置引数として正確に渡す
-        kwargs.pop("model", None)
         return await openai_complete_if_cache(llm_model, *args, **kwargs)  # type: ignore[arg-type]
 
     return LightRAG(
