@@ -220,3 +220,70 @@ def test_ac_f46_04_unit_lightrag_error_code_in_result(tmp_path) -> None:
         result = checker.check()
 
     assert result["lightrag"]["error_code"] == "LIGHTRAG_UNAVAILABLE"
+
+
+# ── AC-F47: インデックス処理中の進捗表示 ─────────────────────────────────────────
+
+
+def _make_url_mock_indexing(docs: int = 10, cur_batch: int = 3):
+    """HTTP 疎通成功（busy=true, docs, cur_batch 付き）モックを生成する。"""
+
+    def fake_urlopen(req, timeout=None):
+        url = req.full_url if hasattr(req, "full_url") else str(req)
+        resp = MagicMock()
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = MagicMock(return_value=False)
+        if "pipeline_status" in url:
+            resp.read.return_value = json.dumps(
+                {"busy": True, "docs": docs, "cur_batch": cur_batch, "batchs": 2}
+            ).encode()
+        elif "/documents" in url:
+            resp.read.return_value = b"[]"
+        else:
+            resp.read.return_value = b"ok"
+        return resp
+
+    return fake_urlopen
+
+
+def test_ac_f47_01_unit_indexing_with_progress(tmp_path) -> None:
+    """AC-F47-01: Unit - Indexing 中に progress.processed と progress.total が返される"""
+    with patch.object(urllib.request, "urlopen", _make_url_mock_indexing(docs=10, cur_batch=3)):
+        from aidd_kos.status import StatusChecker
+
+        checker = StatusChecker(project_dir=tmp_path)
+        result = checker.check()
+
+    assert result["lightrag"]["status"] == "indexing"
+    assert result["lightrag"]["progress"] is not None
+    assert result["lightrag"]["progress"]["processed"] == 3
+    assert result["lightrag"]["progress"]["total"] == 10
+
+
+def test_ac_f47_01_unit_indexing_no_progress_when_docs_zero(tmp_path) -> None:
+    """AC-F47-01 edge: Unit - docs=0 のとき progress が None になる"""
+    with patch.object(urllib.request, "urlopen", _make_url_mock_indexing(docs=0, cur_batch=0)):
+        from aidd_kos.status import StatusChecker
+
+        checker = StatusChecker(project_dir=tmp_path)
+        result = checker.check()
+
+    assert result["lightrag"]["status"] == "indexing"
+    assert result["lightrag"]["progress"] is None
+
+
+def test_ac_f47_03_unit_indexing_complete_returns_ready(tmp_path) -> None:
+    """AC-F47-03: Unit - Indexing 完了後（busy=false）に status = ready を返す"""
+    lightrag_dir = tmp_path / ".lightrag"
+    lightrag_dir.mkdir()
+    (lightrag_dir / "last_indexed_at").write_text("2099-01-01T00:00:00+00:00")
+    (tmp_path / "doc.md").write_text("content")
+
+    with patch.object(urllib.request, "urlopen", _make_url_mock_ok(busy=False)):
+        from aidd_kos.status import StatusChecker
+
+        checker = StatusChecker(project_dir=tmp_path)
+        result = checker.check()
+
+    assert result["lightrag"]["status"] == "ready"
+    assert "indexing" not in result["lightrag"]["status"]
