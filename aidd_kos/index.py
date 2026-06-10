@@ -181,6 +181,56 @@ class IndexOrchestrator:
             )
             sys.exit(1)
 
+    # ── 単一イベントループ用 async ヘルパー（#58: event loop 競合回避） ──────────
+
+    async def _async_fetch_docs(self, rag) -> dict[str, dict]:
+        from lightrag.base import DocStatus
+
+        docs = await rag.get_docs_by_status(DocStatus.PROCESSED)
+        return {
+            doc.file_path: {
+                "id": doc_id,
+                "updated_at": doc.updated_at if hasattr(doc, "updated_at") else "",
+            }
+            for doc_id, doc in docs.items()
+        }
+
+    async def _async_delete_docs(self, rag, deleted: dict[str, str]) -> None:
+        if not deleted:
+            return
+        try:
+            for doc_id in deleted.values():
+                await rag.adelete_by_doc_id(doc_id)
+        except Exception:
+            print(
+                "[aidd-kos] 警告: 削除中にエラーが発生しました。処理を続行します。",
+                file=sys.stderr,
+            )
+
+    async def _async_insert_files(self, rag, files: list[Path]) -> tuple[int, int]:
+        batches_sent = 0
+        skipped_read = 0
+        for i in range(0, len(files), _BATCH_SIZE):
+            batch = files[i : i + _BATCH_SIZE]
+            texts = []
+            sources = []
+            for f in batch:
+                try:
+                    content = f.read_text(encoding="utf-8", errors="replace")
+                    if not content.strip():
+                        skipped_read += 1
+                        continue
+                    texts.append(content)
+                    sources.append(self._to_source_key(f))
+                except OSError:
+                    skipped_read += 1
+                    continue
+            if not texts:
+                continue
+            await rag.ainsert(texts, file_paths=sources)
+            batches_sent += 1
+        return batches_sent, skipped_read
+
     def _write_last_indexed_at(self) -> None:
         """正常完了後に .lightrag/last_indexed_at を更新する。"""
         lightrag_path = Path(self._lightrag_dir)
@@ -198,7 +248,51 @@ class IndexOrchestrator:
                 shutil.rmtree(lightrag_path)
             lightrag_path.mkdir(parents=True, exist_ok=True)
 
-            batches_sent, skipped_read = self._send_files(files)
+        async def _execute() -> dict:
+            """fetch / delete / insert を単一イベントループで実行し event loop 競合を回避する（#58）。"""
+            rag = create_lightrag_instance(self._lightrag_dir)
+            await rag.initialize_storages()
+            try:
+                if full:
+                    batches_sent, skipped_read = await self._async_insert_files(rag, files)
+                    return {"batches_sent": batches_sent, "skipped_read": skipped_read}
+
+                indexed = await self._async_fetch_docs(rag)
+                new_files, modified_files, skip_files = self._classify_files(files, indexed)
+                modified_docs = {
+                    self._to_source_key(f): indexed[self._to_source_key(f)]["id"]
+                    for f in modified_files
+                    if self._to_source_key(f) in indexed
+                }
+                deleted_docs = self._detect_deleted(files, indexed)
+                docs_to_delete = {**modified_docs, **deleted_docs}
+                await self._async_delete_docs(rag, docs_to_delete)
+                to_process = new_files + modified_files
+                batches_sent, skipped_read = await self._async_insert_files(rag, to_process)
+                return {
+                    "new_files": new_files,
+                    "modified_files": modified_files,
+                    "skip_files": skip_files,
+                    "deleted_docs": deleted_docs,
+                    "to_process": to_process,
+                    "batches_sent": batches_sent,
+                    "skipped_read": skipped_read,
+                }
+            finally:
+                await rag.finalize_storages()
+
+        try:
+            r = asyncio.run(_execute())
+        except Exception as e:
+            emit_error(
+                LIGHTRAG_UNAVAILABLE,
+                f"LightRAG へのインデックス送信に失敗しました ({type(e).__name__}）",
+            )
+            sys.exit(1)
+
+        if full:
+            batches_sent = r["batches_sent"]
+            skipped_read = r["skipped_read"]
             if files and batches_sent == 0:
                 emit_error(
                     LIGHTRAG_UNAVAILABLE,
@@ -218,21 +312,13 @@ class IndexOrchestrator:
                 "file_count": full_count,  # backward compat
             }
 
-        indexed = self._fetch_indexed_docs()
-        new_files, modified_files, skip_files = self._classify_files(files, indexed)
-
-        # 変更ファイルは LightRAG が上書き禁止のため先に DELETE してから再インサートする
-        modified_docs = {
-            self._to_source_key(f): indexed[self._to_source_key(f)]["id"]
-            for f in modified_files
-            if self._to_source_key(f) in indexed
-        }
-        deleted_docs = self._detect_deleted(files, indexed)
-        docs_to_delete = {**modified_docs, **deleted_docs}
-        self._delete_docs(docs_to_delete)
-
-        to_process = new_files + modified_files
-        batches_sent, skipped_read = self._send_files(to_process)
+        new_files = r["new_files"]
+        modified_files = r["modified_files"]
+        skip_files = r["skip_files"]
+        deleted_docs = r["deleted_docs"]
+        to_process = r["to_process"]
+        batches_sent = r["batches_sent"]
+        skipped_read = r["skipped_read"]
 
         # C-3: 送信対象があるのに1件も送信できなかった場合はエラーを通知する
         if to_process and batches_sent == 0:
