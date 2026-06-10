@@ -1,6 +1,6 @@
 [project]
 name = "aidd-kos"
-version = "0.3.1"
+version = "0.3.2"
 description = "Agentic Knowledge OS — LightRAG knowledge graph + MCP server for AI-driven development"
 readme = "README.md"
 license = { text = "MIT" }
