@@ -41,7 +41,8 @@ mcp.mount(_codegraph_proxy, namespace="codegraph")
 | 種別 | 場所 | 計測内容 |
 |------|------|---------|
 | ログ | `server.py` モジュール初期化時 | CodeGraph proxy のマウント成功/失敗を stdout |
-| エラー | CodeGraph 未起動/未初期化時 | `kos_status` の `codegraph.status` が `"unavailable"` になること（AC-F02-06）。stderr タイムアウト出力（AC-F02-07、手動確認）|
+| エラー | CodeGraph 未起動/未初期化時 | `kos_status` の `codegraph.status` が `"unavailable"` になること（AC-F02-06）|
+| エラー（手動確認）| CodeGraph 未起動/未初期化時 | 3 秒以内に stderr へエラーコードと対処手順が出力されること（AC-F02-07）|
 
 ## Implementation Tasks
 
