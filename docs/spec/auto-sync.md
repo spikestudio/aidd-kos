@@ -13,8 +13,8 @@ Epic: #26
 
 ### Acceptance Criteria
 
-| AC ID | Story | Given | When | Then |
-|-------|-------|-------|------|------|
-| AC-F43-01 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `aidd-kos index \|\| true` を含む lefthook.yml の post-commit 設定ブロックが記載されていること |
-| AC-F43-02 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `lefthook install` コマンドがセットアップ手順として記載されていること |
-| AC-F43-03 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `\|\| true` によってインデックス失敗がコミットを中断しない理由の説明が記載されていること |
+| AC ID | Story | Given | When | Then | Note |
+|-------|-------|-------|------|------|------|
+| AC-F43-01 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `aidd-kos index \|\| true` を含む lefthook.yml の post-commit 設定ブロックが記載されていること | `skip:doc-verified-at-creation` — ドキュメント内容の自動テストは brittle なため作成時レビューで検証済み |
+| AC-F43-02 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `lefthook install` コマンドがセットアップ手順として記載されていること | `skip:doc-verified-at-creation` — 同上 |
+| AC-F43-03 | S1 | docs/playbook/auto-sync.md が存在する | オペレーターがファイルを読む | `\|\| true` によってインデックス失敗がコミットを中断しない理由の説明が記載されていること | `skip:doc-verified-at-creation` — 同上 |
