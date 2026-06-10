@@ -214,14 +214,7 @@ class IndexOrchestrator:
         """
         from lightrag.base import DocStatus
 
-        incomplete = [
-            DocStatus.FAILED,
-            DocStatus.PARSING,
-            DocStatus.ANALYZING,
-            DocStatus.PROCESSING,
-            DocStatus.PREPROCESSED,
-            DocStatus.PENDING,
-        ]
+        incomplete = [s for s in DocStatus if s is not DocStatus.PROCESSED]
         for status in incomplete:
             try:
                 docs = await rag.get_docs_by_status(status)
@@ -229,8 +222,11 @@ class IndexOrchestrator:
                     if doc.file_path in fs_keys:
                         with contextlib.suppress(Exception):
                             await rag.adelete_by_doc_id(doc_id)
-            except Exception:
-                pass
+            except Exception as e:
+                print(
+                    f"[aidd-kos] 警告: {status.value} ドキュメントのクリーンアップに失敗しました: {e}",
+                    file=sys.stderr,
+                )
 
     async def _async_insert_files(self, rag, files: list[Path]) -> tuple[int, int]:
         batches_sent = 0
