@@ -20,7 +20,7 @@ so that 別途ナレッジエンジンを手動で起動する手間なくプロ
 
 | ID | Given | When | Then | Note |
 |----|-------|------|------|------|
-| AC-F14-01 | MCP サーバーが起動している（ナレッジエンジンは手動起動していない） | ナレッジ検索ツールを呼び出したとき | `LIGHTRAG_UNAVAILABLE` エラーを返さずに検索結果が返されること | `skip:implicit-coverage` — AC-F41-01 が同条件をカバー済み |
+| AC-F14-01 | MCP サーバーが起動している（ナレッジエンジンは手動起動していない） | ナレッジ検索ツールを呼び出したとき | `LIGHTRAG_UNAVAILABLE` エラーを返さずに検索結果が返されること | `skip:implicit-coverage` — `test_ac_f41_01_lightrag_query_available_immediately_after_startup` が実質的に同条件をカバー（AC-F41-01 の spec 定義は dual-process だが当該テストは single-process で embedded startup を検証）|
 | AC-F14-02 | MCP サーバーが起動処理中（起動から 30 秒以内） | ナレッジ検索ツールを最初に呼び出したとき | MCP サーバー起動から 30 秒以内に検索結果が返されること（タイムアウトエラーなし） | `skip:timing-dependent` — 30秒タイムアウト計測は CI で不安定なため手動確認 |
 
 ---
