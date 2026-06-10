@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import shutil
 import sys
 import time
@@ -207,6 +208,30 @@ class IndexOrchestrator:
                 file=sys.stderr,
             )
 
+    async def _cleanup_incomplete_docs(self, rag, fs_keys: set[str]) -> None:
+        """前回の中断で PARSING/FAILED 等の不完全状態に残ったドキュメントを削除する（#62）。
+        対象は現在の対象プロジェクトのファイルキーと一致するものに限定する。
+        """
+        from lightrag.base import DocStatus
+
+        incomplete = [
+            DocStatus.FAILED,
+            DocStatus.PARSING,
+            DocStatus.ANALYZING,
+            DocStatus.PROCESSING,
+            DocStatus.PREPROCESSED,
+            DocStatus.PENDING,
+        ]
+        for status in incomplete:
+            try:
+                docs = await rag.get_docs_by_status(status)
+                for doc_id, doc in docs.items():
+                    if doc.file_path in fs_keys:
+                        with contextlib.suppress(Exception):
+                            await rag.adelete_by_doc_id(doc_id)
+            except Exception:
+                pass
+
     async def _async_insert_files(self, rag, files: list[Path]) -> tuple[int, int]:
         batches_sent = 0
         skipped_read = 0
@@ -257,6 +282,8 @@ class IndexOrchestrator:
                     batches_sent, skipped_read = await self._async_insert_files(rag, files)
                     return {"batches_sent": batches_sent, "skipped_read": skipped_read}
 
+                fs_keys = {self._to_source_key(f) for f in files}
+                await self._cleanup_incomplete_docs(rag, fs_keys)
                 indexed = await self._async_fetch_docs(rag)
                 new_files, modified_files, skip_files = self._classify_files(files, indexed)
                 modified_docs = {
